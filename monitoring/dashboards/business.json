@@ -1,0 +1,125 @@
+{
+  "dashboard": {
+    "title": "Athena Business Metrics",
+    "tags": ["business", "kpi"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Charters Created (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(charters_created_total[24h])"
+          }
+        ],
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Revenue Booked (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(revenue_booked_total[24h])"
+          }
+        ],
+        "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Active Charters",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "charters_active"
+          }
+        ],
+        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 }
+      },
+      {
+        "id": 4,
+        "title": "Total Clients",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "clients_total"
+          }
+        ],
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 }
+      },
+      {
+        "id": 5,
+        "title": "Charters by Status",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status) (charters_by_status)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 }
+      },
+      {
+        "id": 6,
+        "title": "Revenue by Payment Status",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (payment_status) (revenue_by_payment_status)",
+            "legendFormat": "{{payment_status}}"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 }
+      },
+      {
+        "id": 7,
+        "title": "Charters Created Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(charters_created_total[1h])",
+            "legendFormat": "Charters/hour"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 }
+      },
+      {
+        "id": 8,
+        "title": "Revenue Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(revenue_booked_total[1h])",
+            "legendFormat": "Revenue/hour"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 26 }
+      },
+      {
+        "id": 9,
+        "title": "Vehicle Utilization",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "vehicle_utilization_percent",
+            "legendFormat": "{{vehicle_type}}"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 12, "x": 0, "y": 36 }
+      },
+      {
+        "id": 10,
+        "title": "Top Clients by Revenue",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (client_name) (client_revenue_total))",
+            "legendFormat": "{{client_name}}"
+          }
+        ],
+        "gridPos": { "h": 10, "w": 12, "x": 12, "y": 36 }
+      }
+    ]
+  }
+}

@@ -1,0 +1,271 @@
+# Athena Charter Management System - .gitignore
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+credentials/
+
+# ============================================
+# Python
+# ============================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Environments
+venv/
+ENV/
+env/
+.venv
+
+# ============================================
+# Node.js / Frontend
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.next/
+out/
+.nuxt/
+.cache/
+.parcel-cache/
+.vitepress/cache
+.vitepress/dist
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
+*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# IDE / Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# ============================================
+# Playwright / E2E Testing
+# ============================================
+test-results/
+playwright-report/
+playwright/.cache/
+*.trace
+
+# ============================================
+# Docker
+# ============================================
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Docker volumes (if committed)
+.docker/
+
+# ============================================
+# Airflow
+# ============================================
+airflow/logs/
+airflow/*.log
+airflow/*.pid
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/unittests.cfg
+airflow/webserver_config.py
+airflow/__pycache__/
+airflow/dags/__pycache__/
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# PostgreSQL
+pgdata/
+postgres_data/
+
+# MongoDB
+mongo_data/
+mongodb_data/
+
+# Redis
+redis_data/
+dump.rdb
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# ============================================
+# OS
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+.~lock.*
+
+# ============================================
+# Build / Compile Outputs
+# ============================================
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# ============================================
+# Package Files
+# ============================================
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ============================================
+# Project Specific
+# ============================================
+# Don't ignore these important files
+!.gitkeep
+!.gitignore
+!.env.example
+
+# Ignore large test output files
+*.trace
+*.webm
+*.mp4
+
+# Ignore uploaded documents in development
+uploads/
+documents/storage/
+
+# Ignore generated reports
+reports/
+*.pdf
+*.xlsx
+*.csv
+
+# Monitoring data
+monitoring/data/
+grafana/data/
+prometheus/data/
+
+# Backup files
+*.backup
+backup/
+backups/
+
+# Certificate files
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Development database dumps
+*.dump
+*.sql.gz

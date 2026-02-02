@@ -1,0 +1,47 @@
+# Prometheus configuration for monitoring Athena services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'athena'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # RabbitMQ (has native Prometheus metrics)
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['athena-rabbitmq:15692']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Kong API Gateway
+  - job_name: 'kong'
+    static_configs:
+      - targets: ['athena-kong:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # Airflow
+  - job_name: 'airflow-webserver'
+    static_configs:
+      - targets: ['athena-airflow-webserver:8080']
+    metrics_path: '/admin/metrics'
+    scrape_interval: 30s

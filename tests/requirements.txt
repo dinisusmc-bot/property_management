@@ -1,0 +1,10 @@
+# Python test dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-xdist==3.5.0  # Parallel test execution
+requests==2.31.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+locust==2.19.1  # Load testing
+faker==20.1.0  # Generate fake data

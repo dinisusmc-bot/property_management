@@ -1,0 +1,453 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: docker.io/postgres:15-alpine
+    container_name: athena-postgres
+    environment:
+      POSTGRES_USER: athena
+      POSTGRES_PASSWORD: athena_dev_password
+      POSTGRES_DB: athena
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U athena"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Redis Cache
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: athena-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: docker.io/rabbitmq:3.12-management-alpine
+    container_name: athena-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: athena
+      RABBITMQ_DEFAULT_PASS: athena_dev_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - athena-network
+
+  # MongoDB Document Store
+  mongodb:
+    image: docker.io/mongo:7.0
+    container_name: athena-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: athena
+      MONGO_INITDB_ROOT_PASSWORD: athena_dev_password
+      MONGO_INITDB_DATABASE: athena_documents
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/services/auth
+      dockerfile: Dockerfile
+    container_name: athena-auth-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: dev-secret-key-change-in-production
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # Charter Service
+  charter-service:
+    build:
+      context: ./backend/services/charters
+      dockerfile: Dockerfile
+    container_name: athena-charter-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8000
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # Client Service
+  client-service:
+    build:
+      context: ./backend/services/clients
+      dockerfile: Dockerfile
+    container_name: athena-client-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8000
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # Document Service
+  document-service:
+    build:
+      context: ./backend/services/documents
+      dockerfile: Dockerfile
+    container_name: athena-document-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      MONGODB_URL: mongodb://athena:athena_dev_password@mongodb:27017/athena_documents?authSource=admin
+      AUTH_SERVICE_URL: http://auth-service:8000
+      MAX_FILE_SIZE: 10485760
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # API Gateway (Kong)
+  kong-database:
+    image: docker.io/postgres:15-alpine
+    container_name: athena-kong-db
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+      POSTGRES_DB: kong
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  kong-migration:
+    image: docker.io/kong/kong:3.4
+    container_name: athena-kong-migration
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PG_DATABASE: kong
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  kong:
+    image: docker.io/kong/kong:3.4
+    container_name: athena-kong
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PG_DATABASE: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+    ports:
+      - "8080:8000"
+      - "8443:8443"
+      - "8081:8001"
+      - "8444:8444"
+    depends_on:
+      - kong-migration
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - athena-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: athena-frontend
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - "3000:80"
+    networks:
+      - athena-network
+
+  # Airflow PostgreSQL
+  airflow-postgres:
+    image: docker.io/postgres:15-alpine
+    container_name: athena-airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Airflow Redis
+  airflow-redis:
+    image: docker.io/redis:7-alpine
+    container_name: athena-airflow-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: athena-airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: dev-webserver-secret-key
+      AIRFLOW__WEBSERVER__WORKERS: 2
+      AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL: 1800
+      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
+      AIRFLOW_CONN_ATHENA_DB: postgresql://athena:athena_dev_password@postgres:5432/athena
+    ports:
+      - "8082:8080"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:z
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: athena-airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:z
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Airflow Worker
+  airflow-worker:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: athena-airflow-worker
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:z
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    command: celery worker
+    healthcheck:
+      test: ["CMD", "celery", "--app", "airflow.executors.celery_executor.app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - athena-network
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: docker.io/prom/prometheus:latest
+    container_name: athena-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - prometheus_config:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - athena-network
+
+  # Monitoring - Grafana
+  grafana:
+    image: docker.io/grafana/grafana:latest
+    container_name: athena-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # SMTP / Email settings for reports
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: "smtp.gmail.com:587"
+      GF_SMTP_USER: "your-email@gmail.com"
+      GF_SMTP_PASSWORD: "your-app-password"
+      GF_SMTP_FROM_ADDRESS: "your-email@gmail.com"
+      GF_SMTP_FROM_NAME: "Athena Coach Grafana"
+      GF_SMTP_SKIP_VERIFY: "false"
+      # Enable image rendering for email reports
+      GF_RENDERING_SERVER_URL: "http://renderer:8081/render"
+      GF_RENDERING_CALLBACK_URL: "http://grafana:3000/"
+      GF_LOG_FILTERS: "rendering:debug"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/provisioning/dashboards:/etc/grafana/provisioning/dashboards:Z
+      - ./monitoring/provisioning/datasources:/etc/grafana/provisioning/datasources:Z
+    depends_on:
+      - prometheus
+      - renderer
+    networks:
+      - athena-network
+
+  # Grafana Image Renderer for PDF/PNG reports
+  renderer:
+    image: docker.io/grafana/grafana-image-renderer:latest
+    container_name: athena-grafana-renderer
+    ports:
+      - "8085:8081"
+    environment:
+      ENABLE_METRICS: "true"
+      HTTP_PORT: "8081"
+    networks:
+      - athena-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  mongodb_data:
+  kong_data:
+  airflow_postgres_data:
+  airflow_logs:
+  airflow_plugins:
+  prometheus_config:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  athena-network:
+    driver: bridge
