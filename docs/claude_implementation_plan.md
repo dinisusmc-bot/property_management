@@ -21,6 +21,28 @@
 
 ## Prerequisites & Setup
 
+### Architecture Note: Database Schema Approach
+
+**IMPORTANT:** All services in the Athena platform use a **shared database with separate schemas** approach:
+
+- **Database:** `athena` (shared by all services)
+- **Isolation:** Each service uses its own PostgreSQL schema:
+  - Existing: `auth`, `charter`, `client`, `document`, `payment`, `notification`
+  - New: `sales`, `pricing`, `vendor`, `change_mgmt`
+
+**Benefits:**
+- ✅ Consistent with existing architecture
+- ✅ Simplified database management (single connection pool)
+- ✅ Easier backup/restore operations
+- ✅ Schema-level isolation while maintaining centralized management
+
+**Implementation Pattern:**
+Each new service must:
+1. Use `DATABASE_URL` pointing to `athena` database
+2. Define a `SCHEMA_NAME` in config.py
+3. Configure search_path in database connection: `options="-c search_path={SCHEMA_NAME},public"`
+4. Create schema on startup: `CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}`
+
 ### Environment Preparation
 Before starting any implementation, ensure you have:
 
@@ -39,6 +61,8 @@ Before starting any implementation, ensure you have:
    ```bash
    # Test PostgreSQL connection
    docker exec -it athena-postgres psql -U athena -d athena -c "\dt"
+   # View existing schemas
+   docker exec -it athena-postgres psql -U athena -d athena -c "\dn"
    ```
 
 3. **Python Environment**:
@@ -54,7 +78,7 @@ Before starting any implementation, ensure you have:
 ### Overview
 **Goal:** Create a new microservice to manage leads before they become charters.  
 **Port:** 8007  
-**Database:** `sales_db`
+**Database:** `athena` (schema: `sales`)
 
 ---
 
@@ -118,9 +142,10 @@ tree backend/services/sales
 
    # Database Configuration
    DATABASE_URL = os.getenv(
-       "SALES_DATABASE_URL",
-       "postgresql://athena:athena_dev_password@localhost:5432/sales_db"
+       "DATABASE_URL",
+       "postgresql://athena:athena_dev_password@localhost:5432/athena"
    )
+   SCHEMA_NAME = "sales"
 
    # Service Configuration
    SERVICE_NAME = "sales"
@@ -152,17 +177,20 @@ tree backend/services/sales
    """
    Database configuration for Sales Service
    """
-   from sqlalchemy import create_engine
+   from sqlalchemy import create_engine, event
    from sqlalchemy.ext.declarative import declarative_base
    from sqlalchemy.orm import sessionmaker
    import config
 
-   # Create engine
+   # Create engine with schema search path
    engine = create_engine(
        config.DATABASE_URL,
        pool_pre_ping=True,
        pool_size=10,
-       max_overflow=20
+       max_overflow=20,
+       connect_args={
+           "options": f"-c search_path={config.SCHEMA_NAME},public"
+       }
    )
 
    # Create session factory
@@ -813,6 +841,7 @@ Sales Service - Lead Management and Assignment
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -827,12 +856,18 @@ from schemas import (
     EmailPreferenceUpdate, EmailPreferenceResponse
 )
 from business_logic import LeadAssignmentService, LeadConversionService
+import config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create database tables
+# Create schema if it doesn't exist
+with engine.connect() as conn:
+    conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {config.SCHEMA_NAME}"))
+    conn.commit()
+
+# Create database tables in the schema
 Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app
@@ -1214,31 +1249,34 @@ docker-compose config
 
 ---
 
-### Task 1.8: Create Database
+### Task 1.8: Verify Database Connection
 
-**Estimated Time:** 10 minutes
+**Estimated Time:** 5 minutes
 
 **Instructions:**
-1. Create the sales database:
+1. Verify PostgreSQL is running and athena database exists:
    ```bash
-   # Connect to PostgreSQL
+   # Check PostgreSQL container
+   docker ps | grep athena-postgres
+   
+   # Connect to athena database
    docker exec -it athena-postgres psql -U athena -d athena
    ```
 
-2. Run SQL command:
+2. Verify connection:
    ```sql
-   CREATE DATABASE sales_db;
-   \c sales_db
-   -- Verify connection
-   \conninfo
+   -- Check existing schemas
+   \dn
    -- Exit
    \q
    ```
 
+**Note:** The `sales` schema will be created automatically when the service starts (see main.py startup code).
+
 **Verification:**
 ```bash
-docker exec -it athena-postgres psql -U athena -d sales_db -c "\dt"
-# Should show empty table list (tables will be created when service starts)
+docker exec -it athena-postgres psql -U athena -d athena -c "\dn"
+# Should show existing schemas (sales schema will appear after service starts)
 ```
 
 ---
@@ -2051,7 +2089,7 @@ curl -X POST "http://localhost:8002/api/v1/charters/create-recurring?base_charte
 ### Overview
 **Goal:** Dynamic pricing rules instead of hardcoded logic.  
 **Port:** 8008  
-**Database:** `pricing_db`
+**Database:** `athena` (schema: `pricing`)
 
 ---
 
@@ -3002,9 +3040,10 @@ if __name__ == "__main__":
     restart: unless-stopped
 ```
 
-2. Create database:
+2. Verify database connection:
    ```bash
-   docker exec -it athena-postgres psql -U athena -c "CREATE DATABASE pricing_db;"
+   # The pricing schema will be created automatically on service startup
+   docker exec -it athena-postgres psql -U athena -d athena -c "\dn"
    ```
 
 3. Build and start:
@@ -3252,7 +3291,7 @@ curl http://localhost:8080/api/v1/pricing/health
 ### Overview
 **Goal:** Vendor portal and bid management.  
 **Port:** 8006  
-**Database:** `vendor_db`
+**Database:** `athena` (schema: `vendor`)
 
 ---
 
@@ -3262,7 +3301,7 @@ curl http://localhost:8080/api/v1/pricing/health
 
 **Instructions:**
 1. Create structure (follow same pattern as Sales/Pricing services)
-2. Update config for port 8006 and vendor_db
+2. Update config for port 8006 and use `athena` database with `vendor` schema
 3. Create vendor-specific models
 
 ---
@@ -3659,7 +3698,7 @@ curl -X PUT http://localhost:8080/api/v1/portal/client/preferences \
 ### Overview
 **Goal:** Track and manage post-booking changes with approval workflows.  
 **Port:** 8010  
-**Database:** `change_mgmt_db`
+**Database:** `athena` (schema: `change_mgmt`)
 
 ---
 

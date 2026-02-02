@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import Field
 import logging
 import httpx
 
@@ -1062,6 +1063,234 @@ async def update_driver_location(charter_id: int, request: Request, db: Session 
     logger.info(f"Driver {user_id} updated location for charter {charter_id}: {location}")
     
     return {"message": "Location updated successfully"}
+
+# =====================
+# Phase 2: Charter Enhancements
+# =====================
+
+@app.post("/charters/{charter_id}/clone", response_model=CharterResponse, status_code=status.HTTP_201_CREATED)
+async def clone_charter(
+    charter_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Clone an existing charter with all its details and stops.
+    Creates a new charter in 'quote' status.
+    """
+    # Get the original charter
+    original = db.query(Charter).filter(Charter.id == charter_id).first()
+    if not original:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Charter not found")
+    
+    # Create new charter with cloned data
+    cloned = Charter(
+        client_id=original.client_id,
+        vehicle_id=original.vehicle_id,
+        vendor_id=original.vendor_id,
+        driver_id=None,  # Reset driver
+        status="quote",  # Always start as quote
+        trip_date=original.trip_date,
+        passengers=original.passengers,
+        trip_hours=original.trip_hours,
+        is_overnight=original.is_overnight,
+        is_weekend=original.is_weekend,
+        trip_type=original.trip_type,
+        requires_second_driver=original.requires_second_driver,
+        vehicle_count=original.vehicle_count,
+        base_cost=original.base_cost,
+        mileage_cost=original.mileage_cost,
+        additional_fees=original.additional_fees,
+        total_cost=original.total_cost,
+        vendor_base_cost=original.vendor_base_cost,
+        vendor_mileage_cost=original.vendor_mileage_cost,
+        vendor_additional_fees=original.vendor_additional_fees,
+        vendor_total_cost=original.vendor_total_cost,
+        client_base_charge=original.client_base_charge,
+        client_mileage_charge=original.client_mileage_charge,
+        client_additional_fees=original.client_additional_fees,
+        client_total_charge=original.client_total_charge,
+        profit_margin=original.profit_margin,
+        notes=original.notes,
+        vendor_notes=original.vendor_notes,
+        cloned_from_charter_id=charter_id
+    )
+    
+    db.add(cloned)
+    db.flush()  # Get the ID
+    
+    # Clone stops
+    for stop in original.stops:
+        cloned_stop = Stop(
+            charter_id=cloned.id,
+            sequence=stop.sequence,
+            location=stop.location,
+            arrival_time=stop.arrival_time,
+            departure_time=stop.departure_time,
+            notes=stop.notes,
+            latitude=stop.latitude,
+            longitude=stop.longitude,
+            geocoded_address=stop.geocoded_address,
+            stop_type=stop.stop_type,
+            estimated_arrival=stop.estimated_arrival,
+            estimated_departure=stop.estimated_departure
+        )
+        db.add(cloned_stop)
+    
+    db.commit()
+    db.refresh(cloned)
+    
+    logger.info(f"Cloned charter {charter_id} to new charter {cloned.id}")
+    return cloned
+
+
+@app.post("/charters/recurring", response_model=List[CharterResponse], status_code=status.HTTP_201_CREATED)
+async def create_recurring_charters(
+    charter_data: CharterCreate,
+    recurrence_rule: str = Query(..., description="Recurrence pattern: daily, weekly, biweekly, monthly"),
+    instance_count: int = Query(..., ge=1, le=52, description="Number of instances (max 52)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a series of recurring charters based on a recurrence rule.
+    
+    Args:
+        charter_data: Base charter data
+        recurrence_rule: Simple recurrence pattern (e.g., "weekly", "biweekly", "monthly")
+        instance_count: Number of instances to create
+    
+    Returns:
+        List of created charters
+    """
+    from datetime import timedelta
+    
+    # Determine date increment based on recurrence rule
+    if recurrence_rule.lower() == "weekly":
+        increment = timedelta(days=7)
+    elif recurrence_rule.lower() == "biweekly":
+        increment = timedelta(days=14)
+    elif recurrence_rule.lower() == "monthly":
+        increment = timedelta(days=30)  # Simplified monthly
+    elif recurrence_rule.lower() == "daily":
+        increment = timedelta(days=1)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported recurrence rule: {recurrence_rule}. Use: daily, weekly, biweekly, or monthly"
+        )
+    
+    created_charters = []
+    base_trip_date = charter_data.trip_date
+    
+    for i in range(instance_count):
+        # Calculate trip date for this instance
+        trip_date = base_trip_date + (increment * i)
+        
+        # Create charter
+        charter = Charter(
+            client_id=charter_data.client_id,
+            vehicle_id=charter_data.vehicle_id,
+            vendor_id=charter_data.vendor_id,
+            status=charter_data.status or "quote",
+            trip_date=trip_date,
+            passengers=charter_data.passengers,
+            trip_hours=charter_data.trip_hours,
+            is_overnight=charter_data.is_overnight,
+            is_weekend=charter_data.is_weekend,
+            trip_type=charter_data.trip_type,
+            requires_second_driver=charter_data.requires_second_driver,
+            vehicle_count=charter_data.vehicle_count,
+            base_cost=charter_data.base_cost,
+            mileage_cost=charter_data.mileage_cost,
+            additional_fees=charter_data.additional_fees,
+            total_cost=charter_data.total_cost,
+            deposit_amount=charter_data.deposit_amount,
+            vendor_base_cost=charter_data.vendor_base_cost,
+            vendor_mileage_cost=charter_data.vendor_mileage_cost,
+            vendor_additional_fees=charter_data.vendor_additional_fees,
+            vendor_total_cost=charter_data.vendor_total_cost,
+            client_base_charge=charter_data.client_base_charge,
+            client_mileage_charge=charter_data.client_mileage_charge,
+            client_additional_fees=charter_data.client_additional_fees,
+            client_total_charge=charter_data.client_total_charge,
+            profit_margin=charter_data.profit_margin,
+            notes=charter_data.notes,
+            vendor_notes=charter_data.vendor_notes,
+            recurrence_rule=recurrence_rule,
+            instance_number=i + 1,
+            series_total=instance_count,
+            is_series_master=(i == 0)  # First one is the master
+        )
+        
+        db.add(charter)
+        db.flush()  # Get the ID
+        
+        # Add stops
+        if charter_data.stops:
+            for stop_data in charter_data.stops:
+                stop = Stop(
+                    charter_id=charter.id,
+                    sequence=stop_data.sequence or 0,
+                    location=stop_data.location,
+                    arrival_time=stop_data.arrival_time,
+                    departure_time=stop_data.departure_time,
+                    notes=stop_data.notes,
+                    latitude=stop_data.latitude,
+                    longitude=stop_data.longitude,
+                    geocoded_address=stop_data.geocoded_address,
+                    stop_type=stop_data.stop_type,
+                    estimated_arrival=stop_data.estimated_arrival,
+                    estimated_departure=stop_data.estimated_departure
+                )
+                db.add(stop)
+        
+        db.flush()
+        db.refresh(charter)
+        created_charters.append(charter)
+    
+    db.commit()
+    
+    logger.info(f"Created {instance_count} recurring charters with rule: {recurrence_rule}")
+    return created_charters
+
+
+@app.get("/charters/{charter_id}/series", response_model=List[CharterResponse])
+async def get_charter_series(
+    charter_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all charters in a recurring series.
+    If the charter is part of a series, returns all charters with the same recurrence_rule and series_total.
+    """
+    charter = db.query(Charter).filter(Charter.id == charter_id).first()
+    if not charter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Charter not found")
+    
+    if not charter.recurrence_rule:
+        # Not part of a series, just return this charter
+        return [charter]
+    
+    # Find master charter
+    if charter.is_series_master:
+        master_id = charter.id
+    else:
+        # Find the master (instance_number = 1)
+        master = db.query(Charter).filter(
+            Charter.client_id == charter.client_id,
+            Charter.recurrence_rule == charter.recurrence_rule,
+            Charter.is_series_master == True
+        ).first()
+        master_id = master.id if master else charter.id
+    
+    # Get all charters in the series
+    series_charters = db.query(Charter).filter(
+        Charter.client_id == charter.client_id,
+        Charter.recurrence_rule == charter.recurrence_rule,
+        Charter.series_total == charter.series_total
+    ).order_by(Charter.instance_number).all()
+    
+    return series_charters
+
 
 if __name__ == "__main__":
     import uvicorn

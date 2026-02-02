@@ -29,6 +29,13 @@ class StopBase(BaseModel):
     arrival_time: Optional[datetime] = None
     departure_time: Optional[datetime] = None
     notes: Optional[str] = None
+    # Phase 2 fields
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    geocoded_address: Optional[str] = None
+    stop_type: Optional[str] = "waypoint"  # pickup, dropoff, waypoint
+    estimated_arrival: Optional[datetime] = None
+    estimated_departure: Optional[datetime] = None
 
 class StopCreate(StopBase):
     """Schema for creating a stop"""
@@ -66,6 +73,10 @@ class CharterBase(BaseModel):
     vendor_notes: Optional[str] = None
     last_checkin_location: Optional[str] = None
     last_checkin_time: Optional[datetime] = None
+    # Phase 2 Enhancement Fields
+    trip_type: Optional[str] = None  # one-way, round-trip, multi-day
+    requires_second_driver: bool = False
+    vehicle_count: int = 1
 
 class CharterCreate(CharterBase):
     """Schema for creating a charter"""
@@ -121,6 +132,11 @@ class CharterUpdate(BaseModel):
     vendor_notes: Optional[str] = None
     last_checkin_location: Optional[str] = None
     last_checkin_time: Optional[datetime] = None
+    # Phase 2 Enhancement Fields
+    trip_type: Optional[str] = None
+    requires_second_driver: Optional[bool] = None
+    vehicle_count: Optional[int] = None
+    recurrence_rule: Optional[str] = None
     approval_sent_date: Optional[datetime] = None
     approval_amount: Optional[float] = None
     approval_status: Optional[str] = None
@@ -161,6 +177,15 @@ class CharterResponse(CharterBase):
     updated_at: Optional[datetime]
     vehicle: VehicleResponse
     stops: List[StopResponse] = []
+    # Phase 2 Enhancement Fields
+    parent_charter_id: Optional[int] = None
+    quote_secure_token: Optional[str] = None
+    revision_number: Optional[int] = None
+    recurrence_rule: Optional[str] = None
+    instance_number: Optional[int] = None
+    series_total: Optional[int] = None
+    is_series_master: Optional[bool] = None
+    cloned_from_charter_id: Optional[int] = None
     approval_sent_date: Optional[datetime] = None
     approval_amount: Optional[float] = None
     approval_status: Optional[str] = None

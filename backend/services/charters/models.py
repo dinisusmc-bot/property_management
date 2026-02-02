@@ -77,6 +77,19 @@ class Charter(Base):
     last_checkin_location = Column(String, nullable=True)
     last_checkin_time = Column(DateTime(timezone=True), nullable=True)
     
+    # Charter Enhancement Fields (Phase 2)
+    trip_type = Column(String(50), nullable=True)  # one-way, round-trip, multi-day, etc.
+    requires_second_driver = Column(Boolean, default=False)
+    vehicle_count = Column(Integer, default=1)
+    parent_charter_id = Column(Integer, ForeignKey("charters.id"), nullable=True)
+    quote_secure_token = Column(String(255), unique=True, nullable=True)
+    revision_number = Column(Integer, default=1)
+    recurrence_rule = Column(Text, nullable=True)  # iCal-style recurrence rule
+    instance_number = Column(Integer, nullable=True)  # Instance in series (1, 2, 3...)
+    series_total = Column(Integer, nullable=True)  # Total instances in series
+    is_series_master = Column(Boolean, default=False)  # Master record for recurring series
+    cloned_from_charter_id = Column(Integer, ForeignKey("charters.id"), nullable=True)
+    
     # Workflow fields
     approval_sent_date = Column(DateTime(timezone=True), nullable=True)
     approval_amount = Column(Float, nullable=True)
@@ -157,6 +170,14 @@ class Stop(Base):
     arrival_time = Column(DateTime(timezone=True), nullable=True)
     departure_time = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+    
+    # Phase 2 Enhancement Fields
+    latitude = Column(Float, nullable=True)  # GPS latitude
+    longitude = Column(Float, nullable=True)  # GPS longitude
+    geocoded_address = Column(Text, nullable=True)  # Standardized address from geocoding
+    stop_type = Column(String(20), default="waypoint")  # pickup, dropoff, waypoint
+    estimated_arrival = Column(DateTime(timezone=True), nullable=True)
+    estimated_departure = Column(DateTime(timezone=True), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

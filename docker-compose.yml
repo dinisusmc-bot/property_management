@@ -165,6 +165,162 @@ services:
     networks:
       - athena-network
 
+  # Sales Service
+  sales-service:
+    build:
+      context: ./backend/services/sales
+      dockerfile: Dockerfile
+    container_name: athena-sales-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8000
+      CLIENT_SERVICE_URL: http://client-service:8000
+      CHARTER_SERVICE_URL: http://charter-service:8000
+      SECRET_KEY: dev_secret_key_change_in_production
+    ports:
+      - "8007:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      client-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  pricing-service:
+    build:
+      context: ./backend/services/pricing
+      dockerfile: Dockerfile
+    container_name: athena-pricing-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8000
+      CHARTER_SERVICE_URL: http://charter-service:8000
+      SECRET_KEY: dev_secret_key_change_in_production
+    ports:
+      - "8008:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  vendor-service:
+    build:
+      context: ./backend/services/vendor
+      dockerfile: Dockerfile
+    container_name: athena-vendor-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8000
+      CHARTER_SERVICE_URL: http://charter-service:8000
+      NOTIFICATION_SERVICE_URL: http://notification-service:8000
+      SECRET_KEY: dev_secret_key_change_in_production
+    ports:
+      - "8009:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  portals-service:
+    build:
+      context: ./backend/services/portals
+      dockerfile: Dockerfile
+    container_name: athena-portals-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8000
+      CHARTER_SERVICE_URL: http://charter-service:8000
+      CLIENT_SERVICE_URL: http://client-service:8002
+      SALES_SERVICE_URL: http://sales-service:8000
+      PRICING_SERVICE_URL: http://pricing-service:8000
+      VENDOR_SERVICE_URL: http://vendor-service:8000
+      PAYMENT_SERVICE_URL: http://payment-service:8004
+      DOCUMENT_SERVICE_URL: http://document-service:8003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      SERVICE_PORT: 8000
+    ports:
+      - "8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+      sales-service:
+        condition: service_started
+      pricing-service:
+        condition: service_started
+      vendor-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  change-mgmt-service:
+    build:
+      context: ./backend/services/change_mgmt
+      dockerfile: Dockerfile
+    container_name: athena-change-mgmt-service
+    environment:
+      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
+      AUTH_SERVICE_URL: http://auth-service:8000
+      CHARTER_SERVICE_URL: http://charter-service:8000
+      CLIENT_SERVICE_URL: http://client-service:8002
+      VENDOR_SERVICE_URL: http://vendor-service:8000
+      PRICING_SERVICE_URL: http://pricing-service:8000
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      SERVICE_PORT: 8000
+      AUTO_APPROVE_MINOR_CHANGES: "false"
+      REQUIRE_MANAGER_APPROVAL_THRESHOLD: "500"
+      CHANGE_NOTIFICATION_ENABLED: "true"
+    ports:
+      - "8011:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
   # API Gateway (Kong)
   kong-database:
     image: docker.io/postgres:15-alpine
