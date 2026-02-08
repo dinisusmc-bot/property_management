@@ -11,7 +11,7 @@ export default defineConfig({
   timeout: 90 * 1000,
   
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: false,
   
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: !!process.env.CI,
@@ -19,8 +19,11 @@ export default defineConfig({
   /* Retry flaky tests for better reliability */
   retries: process.env.CI ? 2 : 1,
   
-  /* Use 36 workers for parallel testing (full CPU utilization) */
-  workers: process.env.CI ? 1 : 36,
+  /* Stop after N failures to address issues in batches */
+  maxFailures: process.env.MAX_FAILURES ? parseInt(process.env.MAX_FAILURES) : 10,
+  
+  /* Use fewer workers locally to avoid overwhelming the services */
+  workers: process.env.CI ? 1 : 6,
   
   /* Global timeout for the entire test run */
   globalTimeout: 30 * 60 * 1000,

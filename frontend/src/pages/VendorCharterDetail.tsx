@@ -136,7 +136,7 @@ export default function VendorCharterDetail() {
     try {
       setLoading(true)
       setError('')
-      const response = await api.get(`/api/v1/charters/charters/${id}`)
+      const response = await api.get(`/api/v1/charters/${id}`)
       setCharter(response.data)
       setVendorNotes(response.data.vendor_notes || '')
     } catch (err: any) {
@@ -158,7 +158,7 @@ export default function VendorCharterDetail() {
         if (currentCharter) {
           try {
             const checkinTime = new Date().toISOString()
-            await api.post(`/api/v1/charters/charters/${currentCharter.id}/checkin`, {
+            await api.post(`/api/v1/charters/${currentCharter.id}/checkin`, {
               location: locationString,
               checkin_time: checkinTime
             })
@@ -185,7 +185,7 @@ export default function VendorCharterDetail() {
 
     try {
       setSaving(true)
-      await api.put(`/api/v1/charters/charters/${charter.id}`, {
+      await api.put(`/api/v1/charters/${charter.id}`, {
         vendor_notes: vendorNotes
       })
       setError('')
@@ -204,7 +204,7 @@ export default function VendorCharterDetail() {
     if (!location) return
 
     try {
-      await api.post(`/api/v1/charters/charters/${charter.id}/checkin`, {
+      await api.post(`/api/v1/charters/${charter.id}/checkin`, {
         location,
         checkin_time: new Date().toISOString()
       })

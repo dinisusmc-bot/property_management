@@ -95,7 +95,7 @@ export default function VendorDetail() {
   const fetchVendorCharters = async () => {
     try {
       setLoadingCharters(true)
-      const response = await api.get('/api/v1/charters/charters', {
+      const response = await api.get('/api/v1/charters', {
         params: { vendor_id: id }
       })
       setCharters(response.data)

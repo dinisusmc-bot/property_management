@@ -65,7 +65,7 @@ export default function VendorDashboard() {
       setLoading(true)
       setError('')
       // Fetch all charters assigned to this vendor
-      const response = await api.get(`/api/v1/charters/charters?vendor_id=${user?.id}`)
+      const response = await api.get(`/api/v1/charters?vendor_id=${user?.id}`)
       setCharters(response.data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load charters')

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -9,8 +9,9 @@ from bson import ObjectId
 from database import get_db, Base, engine
 from mongodb import get_gridfs
 from models import CharterDocument
-from schemas import DocumentResponse
+from schemas import DocumentResponse, SignatureRequestCreate, SignatureSubmit, SignatureRequestResponse, SignatureRequestDetail
 from config import settings
+from signature_service import SignatureService
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -204,6 +205,153 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Document deleted successfully"}
+
+
+# ============================================================================
+# Task 8.5: E-Signature Endpoints
+# ============================================================================
+
+@app.post("/documents/{document_id}/request-signature")
+def request_signature(
+    document_id: int,
+    request_data: SignatureRequestCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Request signature on document.
+    
+    Sends email to signer with link to sign document.
+    
+    - **signer_name**: Full name of person signing
+    - **signer_email**: Email to send signature request
+    - **signer_role**: Role (client, vendor, driver, etc.)
+    - **request_message**: Custom message to include
+    - **expires_days**: Days until request expires (1-90)
+    """
+    try:
+        result = SignatureService.create_signature_request(
+            document_id=document_id,
+            signer_name=request_data.signer_name,
+            signer_email=request_data.signer_email,
+            signer_role=request_data.signer_role,
+            request_message=request_data.request_message,
+            expires_days=request_data.expires_days,
+            created_by=None,  # TODO: Add auth and get current user
+            db=db
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to create signature request: {str(e)}")
+
+
+@app.get("/signature-requests/{request_id}", tags=["Public"])
+def get_signature_request(
+    request_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get signature request details (PUBLIC - no auth required).
+    
+    Used by signing page to display document info.
+    """
+    try:
+        return SignatureService.get_signature_request(request_id, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get signature request: {str(e)}")
+
+
+@app.post("/signature-requests/{request_id}/sign", tags=["Public"])
+def submit_signature(
+    request_id: int,
+    signature_data: SignatureSubmit,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit signature for document (PUBLIC - no auth required).
+    
+    - **signature_image**: Base64 encoded PNG of signature
+    - **signer_name**: Typed name (must match request)
+    
+    Validates signature and marks request as signed.
+    """
+    try:
+        # Get client IP and user agent
+        ip_address = request.client.host if request.client else "Unknown"
+        user_agent = request.headers.get("user-agent", "Unknown")
+        
+        result = SignatureService.submit_signature(
+            request_id=request_id,
+            signature_image=signature_data.signature_image,
+            signer_name=signature_data.signer_name,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            db=db
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to submit signature: {str(e)}")
+
+
+@app.get("/documents/{document_id}/signatures")
+def list_document_signatures(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    List all signature requests for document.
+    
+    Shows status, signed dates, and signer info.
+    """
+    try:
+        return SignatureService.list_document_signatures(document_id, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to list signatures: {str(e)}")
+
+
+@app.post("/signature-requests/{request_id}/remind")
+def send_signature_reminder(
+    request_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Send reminder email for pending signature.
+    """
+    try:
+        return SignatureService.send_reminder(request_id, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send reminder: {str(e)}")
+
+
+@app.delete("/signature-requests/{request_id}")
+def cancel_signature_request(
+    request_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel pending signature request.
+    """
+    try:
+        return SignatureService.cancel_signature_request(request_id, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to cancel request: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn

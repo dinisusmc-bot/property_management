@@ -43,8 +43,8 @@ interface Charter {
   trip_hours: number
   status: string
   total_cost: number
-  stops: any[]
-  vehicle: Vehicle
+  stops?: any[]
+  vehicle?: Vehicle | null
 }
 
 export default function CharterList() {
@@ -67,11 +67,31 @@ export default function CharterList() {
   const fetchCharters = async () => {
     try {
       setLoading(true)
-      const [chartersRes, clientsRes] = await Promise.all([
-        api.get('/api/v1/charters/charters'),
-        api.get('/api/v1/clients/clients')
-      ])
-      setCharters(chartersRes.data)
+      const clientsPromise = api.get('/api/v1/clients')
+      let chartersRes
+      try {
+        chartersRes = await api.get('/api/v1/charters')
+      } catch (listError: any) {
+        const statusFilter = ['quote', 'confirmed', 'pending', 'completed']
+        let recovered = false
+
+        for (const status of statusFilter) {
+          try {
+            chartersRes = await api.get('/api/v1/charters', { params: { status } })
+            recovered = true
+            break
+          } catch (statusError) {
+            // Try the next status filter.
+          }
+        }
+
+        if (!recovered) {
+          throw listError
+        }
+      }
+
+      const clientsRes = await clientsPromise
+      setCharters(chartersRes?.data ?? [])
       setClients(clientsRes.data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load charters')
@@ -215,7 +235,7 @@ export default function CharterList() {
                   >
                     <TableCell>{charter.id}</TableCell>
                     <TableCell>{getClientName(charter.client_id)}</TableCell>
-                    <TableCell>{charter.vehicle.name}</TableCell>
+                    <TableCell>{charter.vehicle?.name ?? `Vehicle #${charter.vehicle_id}`}</TableCell>
                     <TableCell>
                       {charter.vendor_name ? (
                         <Box>
@@ -229,11 +249,11 @@ export default function CharterList() {
                     <TableCell>{formatDate(charter.trip_date)}</TableCell>
                     <TableCell>{charter.passengers}</TableCell>
                     <TableCell>{charter.trip_hours}h</TableCell>
-                    <TableCell>{charter.stops.length}</TableCell>
+                    <TableCell>{charter.stops?.length ?? 0}</TableCell>
                     <TableCell>
                       <Chip label={charter.status} color={getStatusColor(charter.status)} size="small" />
                     </TableCell>
-                    <TableCell>${charter.total_cost.toFixed(2)}</TableCell>
+                    <TableCell>${(charter.total_cost ?? 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <Button size="small" onClick={() => navigate(`/charters/${charter.id}`)}>
                         View

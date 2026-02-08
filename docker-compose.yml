@@ -6,9 +6,9 @@ services:
     image: docker.io/postgres:15-alpine
     container_name: athena-postgres
     environment:
-      POSTGRES_USER: athena
-      POSTGRES_PASSWORD: athena_dev_password
-      POSTGRES_DB: athena
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -43,8 +43,8 @@ services:
     image: docker.io/rabbitmq:3.12-management-alpine
     container_name: athena-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: athena
-      RABBITMQ_DEFAULT_PASS: athena_dev_password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -63,9 +63,9 @@ services:
     image: docker.io/mongo:7.0
     container_name: athena-mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: athena
-      MONGO_INITDB_ROOT_PASSWORD: athena_dev_password
-      MONGO_INITDB_DATABASE: athena_documents
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
     ports:
       - "27017:27017"
     volumes:
@@ -85,11 +85,11 @@ services:
       dockerfile: Dockerfile
     container_name: athena-auth-service
     environment:
-      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
-      REDIS_URL: redis://redis:6379
-      SECRET_KEY: dev-secret-key-change-in-production
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
-      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
     ports:
       - "8000:8000"
     depends_on:
@@ -107,10 +107,10 @@ services:
       dockerfile: Dockerfile
     container_name: athena-charter-service
     environment:
-      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
-      AUTH_SERVICE_URL: http://auth-service:8000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
     ports:
       - "8001:8000"
     depends_on:
@@ -130,10 +130,10 @@ services:
       dockerfile: Dockerfile
     container_name: athena-client-service
     environment:
-      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://athena:athena_dev_password@rabbitmq:5672/
-      AUTH_SERVICE_URL: http://auth-service:8000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
     ports:
       - "8002:8000"
     depends_on:
@@ -151,10 +151,10 @@ services:
       dockerfile: Dockerfile
     container_name: athena-document-service
     environment:
-      DATABASE_URL: postgresql://athena:athena_dev_password@postgres:5432/athena
-      MONGODB_URL: mongodb://athena:athena_dev_password@mongodb:27017/athena_documents?authSource=admin
-      AUTH_SERVICE_URL: http://auth-service:8000
-      MAX_FILE_SIZE: 10485760
+      DATABASE_URL: ${DATABASE_URL}
+      MONGODB_URL: ${MONGODB_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
     ports:
       - "8003:8000"
     depends_on:
@@ -165,14 +165,263 @@ services:
     networks:
       - athena-network
 
+  # Payment Service
+  payment-service:
+    build:
+      context: ./backend/services/payments
+      dockerfile: Dockerfile
+    container_name: athena-payment-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./backend/services/notifications
+      dockerfile: Dockerfile
+    container_name: athena-notification-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8005:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - athena-network
+
+  # Sales Service
+  sales-service:
+    build:
+      context: ./backend/services/sales
+      dockerfile: Dockerfile
+    container_name: athena-sales-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CLIENT_SERVICE_URL: ${CLIENT_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8007:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      client-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  pricing-service:
+    build:
+      context: ./backend/services/pricing
+      dockerfile: Dockerfile
+    container_name: athena-pricing-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      TOMTOM_API_KEY: ${TOMTOM_API_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8008:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  vendor-service:
+    build:
+      context: ./backend/services/vendor
+      dockerfile: Dockerfile
+    container_name: athena-vendor-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8009:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  dispatch-service:
+    build:
+      context: ./backend/services/dispatch
+      dockerfile: Dockerfile
+    container_name: athena-dispatch-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8012:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  analytics-service:
+    build:
+      context: ./backend/services/analytics
+      dockerfile: Dockerfile
+    container_name: athena-analytics-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8013:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  portals-service:
+    build:
+      context: ./backend/services/portals
+      dockerfile: Dockerfile
+    container_name: athena-portals-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      CLIENT_SERVICE_URL: ${CLIENT_SERVICE_URL}
+      SALES_SERVICE_URL: ${SALES_SERVICE_URL}
+      PRICING_SERVICE_URL: ${PRICING_SERVICE_URL}
+      VENDOR_SERVICE_URL: ${VENDOR_SERVICE_URL}
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL}
+      DOCUMENT_SERVICE_URL: ${DOCUMENT_SERVICE_URL}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL}
+      SERVICE_PORT: ${SERVICE_PORT}
+    ports:
+      - "8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+      sales-service:
+        condition: service_started
+      pricing-service:
+        condition: service_started
+      vendor-service:
+        condition: service_started
+    networks:
+      - athena-network
+
+  change-mgmt-service:
+    build:
+      context: ./backend/services/change_mgmt
+      dockerfile: Dockerfile
+    container_name: athena-change-mgmt-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHARTER_SERVICE_URL: ${CHARTER_SERVICE_URL}
+      CLIENT_SERVICE_URL: ${CLIENT_SERVICE_URL}
+      VENDOR_SERVICE_URL: ${VENDOR_SERVICE_URL}
+      PRICING_SERVICE_URL: ${PRICING_SERVICE_URL}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL}
+      SERVICE_PORT: ${SERVICE_PORT}
+      AUTO_APPROVE_MINOR_CHANGES: ${AUTO_APPROVE_MINOR_CHANGES}
+      REQUIRE_MANAGER_APPROVAL_THRESHOLD: ${REQUIRE_MANAGER_APPROVAL_THRESHOLD}
+      CHANGE_NOTIFICATION_ENABLED: ${CHANGE_NOTIFICATION_ENABLED}
+    ports:
+      - "8011:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      charter-service:
+        condition: service_started
+    networks:
+      - athena-network
+
   # API Gateway (Kong)
   kong-database:
     image: docker.io/postgres:15-alpine
     container_name: athena-kong-db
     environment:
-      POSTGRES_USER: kong
-      POSTGRES_PASSWORD: kong
-      POSTGRES_DB: kong
+      POSTGRES_USER: ${KONG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${KONG_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${KONG_POSTGRES_DB}
     volumes:
       - kong_data:/var/lib/postgresql/data
     healthcheck:
@@ -190,9 +439,9 @@ services:
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-database
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
-      KONG_PG_DATABASE: kong
+      KONG_PG_USER: ${KONG_POSTGRES_USER}
+      KONG_PG_PASSWORD: ${KONG_POSTGRES_PASSWORD}
+      KONG_PG_DATABASE: ${KONG_POSTGRES_DB}
     depends_on:
       kong-database:
         condition: service_healthy
@@ -205,9 +454,9 @@ services:
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-database
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
-      KONG_PG_DATABASE: kong
+      KONG_PG_USER: ${KONG_POSTGRES_USER}
+      KONG_PG_PASSWORD: ${KONG_POSTGRES_PASSWORD}
+      KONG_PG_DATABASE: ${KONG_POSTGRES_DB}
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
@@ -236,7 +485,7 @@ services:
       dockerfile: Dockerfile
     container_name: athena-frontend
     environment:
-      VITE_API_URL: http://localhost:8080
+      VITE_API_URL: ${VITE_API_URL}
     ports:
       - "3000:80"
     networks:
@@ -247,9 +496,9 @@ services:
     image: docker.io/postgres:15-alpine
     container_name: athena-airflow-db
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     volumes:
       - airflow_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -280,8 +529,8 @@ services:
     container_name: athena-airflow-webserver
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
       AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
@@ -289,8 +538,8 @@ services:
       AIRFLOW__WEBSERVER__SECRET_KEY: dev-webserver-secret-key
       AIRFLOW__WEBSERVER__WORKERS: 2
       AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL: 1800
-      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
-      AIRFLOW_CONN_ATHENA_DB: postgresql://athena:athena_dev_password@postgres:5432/athena
+      AIRFLOW_CONN_POSTGRES_ATHENA: ${DATABASE_URL}
+      AIRFLOW_CONN_ATHENA_DB: ${DATABASE_URL}
     ports:
       - "8082:8080"
     depends_on:
@@ -319,13 +568,13 @@ services:
     container_name: athena-airflow-scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
       AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
+      AIRFLOW_CONN_POSTGRES_ATHENA: ${DATABASE_URL}
     depends_on:
       airflow-postgres:
         condition: service_healthy
@@ -352,13 +601,13 @@ services:
     container_name: athena-airflow-worker
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
       AIRFLOW__CORE__FERNET_KEY: 'dev-fernet-key-change-in-production=='
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW_CONN_POSTGRES_ATHENA: postgresql://athena:athena_dev_password@postgres:5432/athena
+      AIRFLOW_CONN_POSTGRES_ATHENA: ${DATABASE_URL}
     depends_on:
       airflow-postgres:
         condition: service_healthy

@@ -25,6 +25,7 @@ import {
   Person as UserIcon,
   Logout as LogoutIcon,
   Payments as PaymentsIcon,
+  Contacts as LeadsIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
@@ -65,6 +66,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', showForVendor: false },
+    { text: 'Leads', icon: <LeadsIcon />, path: '/leads', showForVendor: false },
     { text: 'Charters', icon: <CharterIcon />, path: '/charters', showForVendor: false },
     { text: 'Clients', icon: <ClientIcon />, path: '/clients', showForVendor: false },
     { text: 'Vendors', icon: <VendorIcon />, path: '/vendors', showForVendor: false },

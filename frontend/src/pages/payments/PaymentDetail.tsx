@@ -95,7 +95,7 @@ export default function PaymentDetail() {
       setPayment(paymentResponse.data)
 
       // Fetch charter details
-      const charterResponse = await api.get(`/api/v1/charters/charters/${paymentResponse.data.charter_id}`)
+      const charterResponse = await api.get(`/api/v1/charters/${paymentResponse.data.charter_id}`)
       setCharter(charterResponse.data)
 
       // Fetch entity (vendor or client) details

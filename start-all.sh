@@ -66,17 +66,39 @@ echo "   Starting charter-service..."
 timeout 30 docker compose up -d charter-service 2>&1 | tail -1
 echo "   Starting document-service..."
 timeout 30 docker compose up -d document-service 2>&1 | tail -1
+echo "   Starting payment-service..."
+timeout 30 docker compose up -d payment-service 2>&1 | tail -1
+echo "   Starting notification-service..."
+timeout 30 docker compose up -d notification-service 2>&1 | tail -1
+echo "   Starting sales-service..."
+timeout 30 docker compose up -d sales-service 2>&1 | tail -1
+echo "   Starting pricing-service..."
+timeout 30 docker compose up -d pricing-service 2>&1 | tail -1
+echo "   Starting vendor-service..."
+timeout 30 docker compose up -d vendor-service 2>&1 | tail -1
+echo "   Starting dispatch-service..."
+timeout 30 docker compose up -d dispatch-service 2>&1 | tail -1
+echo "   Starting analytics-service..."
+timeout 30 docker compose up -d analytics-service 2>&1 | tail -1
+echo "   Starting portals-service..."
+timeout 30 docker compose up -d portals-service 2>&1 | tail -1
+echo "   Starting change-mgmt-service..."
+timeout 30 docker compose up -d change-mgmt-service 2>&1 | tail -1
 
 # Give services time to start
-sleep 3
+sleep 5
 
 # Ensure all services are actually started (podman-compose bug workaround)
 echo "   Verifying all services are running..."
-docker start athena-auth-service athena-client-service athena-charter-service athena-document-service 2>/dev/null || true
+docker start athena-auth-service athena-client-service athena-charter-service athena-document-service \
+  athena-payment-service athena-notification-service athena-sales-service athena-pricing-service \
+  athena-vendor-service athena-dispatch-service athena-analytics-service athena-portals-service \
+  athena-change-mgmt-service 2>/dev/null || true
 
 echo ""
-echo "Step 6: Starting frontend..."
+echo "Step 6: Starting frontend and renderer..."
 timeout 60 docker compose up -d frontend 2>&1 | grep -v "already in use" || echo "   (Frontend starting or already running)"
+timeout 30 docker compose up -d renderer 2>&1 | tail -1
 
 echo ""
 echo "Step 7: Starting Airflow infrastructure..."
@@ -149,11 +171,49 @@ curl -s -X POST http://localhost:8081/services \
 
 curl -s -X POST http://localhost:8081/services \
   --data name=charter-service \
-  --data url=http://athena-charter-service:8000 > /dev/null 2>&1 || echo "   (charter-service exists)"
+  --data url=http://athena-charter-service:8000 \
+  --data path=/charters > /dev/null 2>&1 || echo "   (charter-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=vehicle-service \
+  --data url=http://athena-charter-service:8000/vehicles > /dev/null 2>&1 || echo "   (vehicle-service exists)"
 
 curl -s -X POST http://localhost:8081/services \
   --data name=document-service \
-  --data url=http://athena-document-service:8000 > /dev/null 2>&1 || echo "   (document-service exists)"
+  --data url=http://athena-document-service:8000 \
+  --data path=/documents > /dev/null 2>&1 || echo "   (document-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=payment-service \
+  --data url=http://athena-payment-service:8000 > /dev/null 2>&1 || echo "   (payment-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=sales-service \
+  --data url=http://athena-sales-service:8000 > /dev/null 2>&1 || echo "   (sales-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=pricing-service \
+  --data url=http://athena-pricing-service:8000 > /dev/null 2>&1 || echo "   (pricing-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=vendor-service \
+  --data url=http://athena-vendor-service:8000 > /dev/null 2>&1 || echo "   (vendor-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=dispatch-service \
+  --data url=http://athena-dispatch-service:8000 > /dev/null 2>&1 || echo "   (dispatch-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=analytics-service \
+  --data url=http://athena-analytics-service:8000 > /dev/null 2>&1 || echo "   (analytics-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=portals-service \
+  --data url=http://athena-portals-service:8000 > /dev/null 2>&1 || echo "   (portals-service exists)"
+
+curl -s -X POST http://localhost:8081/services \
+  --data name=change-mgmt-service \
+  --data url=http://athena-change-mgmt-service:8000 > /dev/null 2>&1 || echo "   (change-mgmt-service exists)"
 
 # Create Kong routes
 curl -s -X POST http://localhost:8081/services/auth-service/routes \
@@ -161,14 +221,52 @@ curl -s -X POST http://localhost:8081/services/auth-service/routes \
   --data strip_path=true > /dev/null 2>&1 || echo "   (auth route exists)"
 
 curl -s -X POST http://localhost:8081/services/client-service/routes \
-  --data paths[]=/api/v1/clients > /dev/null 2>&1 || echo "   (client route exists)"
+  --data paths[]=/api/v1/clients \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (client route exists)"
 
 curl -s -X POST http://localhost:8081/services/charter-service/routes \
-  --data paths[]=/api/v1/charters > /dev/null 2>&1 || echo "   (charter route exists)"
+  --data paths[]=/api/v1/charters \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (charter route exists)"
+
+curl -s -X POST http://localhost:8081/services/vehicle-service/routes \
+  --data paths[]=/api/v1/vehicles \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (vehicle route exists)"
 
 curl -s -X POST http://localhost:8081/services/document-service/routes \
   --data paths[]=/api/v1/documents \
   --data strip_path=true > /dev/null 2>&1 || echo "   (document route exists)"
+
+curl -s -X POST http://localhost:8081/services/payment-service/routes \
+  --data paths[]=/api/v1/payments \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (payment route exists)"
+
+curl -s -X POST http://localhost:8081/services/sales-service/routes \
+  --data paths[]=/api/v1/sales \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (sales route exists)"
+
+curl -s -X POST http://localhost:8081/services/pricing-service/routes \
+  --data paths[]=/api/v1/pricing \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (pricing route exists)"
+
+curl -s -X POST http://localhost:8081/services/vendor-service/routes \
+  --data paths[]=/api/v1/vendors \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (vendor route exists)"
+
+curl -s -X POST http://localhost:8081/services/dispatch-service/routes \
+  --data paths[]=/api/v1/dispatch \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (dispatch route exists)"
+
+curl -s -X POST http://localhost:8081/services/analytics-service/routes \
+  --data paths[]=/api/v1/analytics \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (analytics route exists)"
+
+curl -s -X POST http://localhost:8081/services/portals-service/routes \
+  --data paths[]=/api/v1/portal \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (portals route exists)"
+
+curl -s -X POST http://localhost:8081/services/change-mgmt-service/routes \
+  --data paths[]=/api/v1/changes \
+  --data strip_path=true > /dev/null 2>&1 || echo "   (change-mgmt route exists)"
 
 # Enable CORS
 curl -s -X POST http://localhost:8081/plugins \

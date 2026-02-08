@@ -5,7 +5,10 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import HomePage from './pages/HomePage'
 import QuoteLanding from './pages/QuoteLanding'
-import Dashboard from './pages/Dashboard'
+import DashboardPage from './pages/dashboard/DashboardPage'
+import LeadsPage from './pages/leads/LeadsPage'
+import LeadDetailPage from './pages/leads/LeadDetailPage'
+import LeadFormPage from './pages/leads/LeadFormPage'
 import VendorDashboard from './pages/VendorDashboard'
 import VendorCharterDetail from './pages/VendorCharterDetail'
 import DriverDashboard from './pages/driver/DriverDashboard'
@@ -24,6 +27,8 @@ import PaymentsList from './pages/payments/PaymentsList'
 import PaymentDetail from './pages/payments/PaymentDetail'
 import AccountsReceivable from './pages/payments/AccountsReceivable'
 import AccountsPayable from './pages/payments/AccountsPayable'
+import ChangeCasesPage from './pages/changes/ChangeCasesPage'
+import ChangeCaseCreatePage from './pages/changes/ChangeCaseCreatePage'
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -40,7 +45,7 @@ function DashboardRoute() {
   if (user?.role === 'driver') {
     return <Navigate to="/driver" replace />
   }
-  return <Dashboard />
+  return <DashboardPage />
 }
 
 // Non-vendor route component - redirects vendors and drivers trying to access admin pages
@@ -144,6 +149,59 @@ function App() {
               <Layout>
                 <NonVendorRoute>
                   <CharterDetail />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Lead routes - protected from vendors */}
+        <Route
+          path="/leads"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <LeadsPage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leads/new"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <LeadFormPage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leads/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <LeadDetailPage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leads/:id/edit"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <LeadFormPage />
                 </NonVendorRoute>
               </Layout>
             </ProtectedRoute>
@@ -304,6 +362,33 @@ function App() {
               <Layout>
                 <NonVendorRoute>
                   <PaymentDetail />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Change Management routes - protected from vendors */}
+        <Route
+          path="/changes"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <ChangeCasesPage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
+          path="/changes/new"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <ChangeCaseCreatePage />
                 </NonVendorRoute>
               </Layout>
             </ProtectedRoute>

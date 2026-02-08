@@ -90,7 +90,7 @@ export default function ClientCreate() {
       setLoading(true)
       setError('')
       
-      const response = await api.post('/api/v1/clients/clients', formData)
+      const response = await api.post('/api/v1/clients', formData)
       
       // Navigate to the newly created client's detail page
       navigate(`/clients/${response.data.id}`)
