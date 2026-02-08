@@ -78,9 +78,9 @@ export default function AccountsReceivable() {
     try {
       setLoading(true)
       const [chartersResponse, paymentsResponse, clientsResponse] = await Promise.all([
-        api.get('/api/v1/charters/charters'),
+        api.get('/api/v1/charters'),
         api.get('/api/v1/charters/client-payments'),
-        api.get('/api/v1/clients/clients')
+        api.get('/api/v1/clients')
       ])
       
       // Handle response data - it might be nested in a data property

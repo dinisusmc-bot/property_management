@@ -1,0 +1,548 @@
+# CoachWay Implementation Plan - Future Work Only
+
+**Updated:** February 2, 2026  
+**Current Status:** 70% Complete (13 services operational, 200+ endpoints)  
+**Purpose:** Step-by-step implementation guide for remaining 30% of backend capabilities
+
+---
+
+## 🎯 Quick Links
+
+- [Common Patterns & Best Practices](#common-patterns--best-practices)
+- [Kong Gateway Testing Standard](#kong-gateway-testing-standard)
+- [Lessons Learned](#lessons-learned)
+- [Phase Overview](#phase-overview)
+
+---
+
+## Current State Summary
+
+### ✅ Completed Services (13 Operational)
+
+All services tested through Kong Gateway (port 8080):
+
+1. **auth-service** - JWT authentication, users, roles, permissions
+2. **charter-service** - Charter CRUD, vehicles, quotes, stops, vendor payments
+3. **client-service** - Client management, contacts
+4. **document-service** - MongoDB GridFS file storage, upload/download
+5. **payment-service** - Stripe integration, payment schedules, refunds
+6. **notification-service** - Email/SMS via SendGrid/Twilio, templates
+7. **pricing-service** - Price calculation, amenities, promo codes, DOT compliance
+8. **vendor-service** - Vendor profiles, bidding, ratings, compliance, performance metrics
+9. **dispatch-service** - Driver dispatch, GPS tracking, recoveries, events
+10. **analytics-service** - Revenue reports, charter metrics, vendor performance, dashboards
+11. **sales-service** - Leads, activities, round-robin assignment, email preferences
+12. **portals-service** - BFF aggregator for client/vendor/admin portals
+13. **change_mgmt-service** - Change cases, approval workflows, audit history
+
+### 📊 Implementation Status
+
+- **Complete:** 70% of backend capabilities
+- **Missing:** 30% (primarily financial, charter enhancements, security features)
+- **Tests Passing:** 76+ through Kong Gateway
+- **Kong Routes:** All 13 services registered with `strip_path: true`
+
+---
+
+## Phase Overview
+
+### Remaining Implementation Phases
+
+| Phase | Focus | Priority | Estimated Time | Status |
+|-------|-------|----------|----------------|--------|
+| [Phase 1](phase_1.md) | Financial Foundation | 🔴 CRITICAL | 3-4 weeks | ⏩ NEXT |
+| [Phase 2](phase_2.md) | Charter Enhancements | 🔴 CRITICAL | 2-3 weeks | Pending |
+| [Phase 3](phase_3.md) | Sales & Lead Management | 🔴 CRITICAL | 1-2 weeks | Pending |
+| [Phase 4](phase_4.md) | Manager/Config Tools | 🟡 IMPORTANT | 1-2 weeks | Pending |
+| [Phase 5](phase_5.md) | Portal Security | 🟡 IMPORTANT | 2 weeks | Pending |
+| [Phase 6](phase_6.md) | QuickBooks Integration | 🟡 IMPORTANT | 2-4 weeks | Pending |
+| [Phase 7](phase_7.md) | Dispatch & Notification Enhancements | 🟢 NICE TO HAVE | 1-2 weeks | Pending |
+
+**Total Estimated Time:** 12-19 weeks (depending on QuickBooks scope)
+
+---
+
+## Common Patterns & Best Practices
+
+### Service Architecture Pattern
+
+All services follow this standard structure:
+
+```
+backend/services/{service_name}/
+├── app/
+│   ├── main.py           # FastAPI app + routes
+│   ├── models.py         # SQLAlchemy models
+│   ├── schemas.py        # Pydantic schemas
+│   ├── database.py       # DB connection
+│   ├── config.py         # Environment config
+│   └── business_logic.py # Service layer (optional)
+├── Dockerfile
+├── requirements.txt
+└── README.md
+```
+
+### Database Schema Strategy
+
+**CRITICAL:** All services use shared database with separate schemas:
+
+```python
+# config.py pattern for all services
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://athena:athena123@postgres:5432/athena"
+)
+
+SCHEMA_NAME = "service_name"  # e.g., "payment", "vendor", "dispatch"
+
+# database.py pattern
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"options": f"-csearch_path={SCHEMA_NAME},public"}
+)
+
+# Create schema on startup
+def init_db():
+    with engine.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}"))
+        Base.metadata.create_all(conn)
+```
+
+### Standard FastAPI Setup
+
+```python
+# main.py pattern
+from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+app = FastAPI(
+    title="{Service} Service",
+    description="Description of service capabilities",
+    version="1.0.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Health endpoint (required for all services)
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "service": "service-name"}
+
+# Startup event for DB initialization
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+```
+
+### Authentication Pattern
+
+For protected endpoints:
+
+```python
+from auth import get_current_user, require_role
+
+# Require authentication
+@app.get("/protected-endpoint")
+async def protected_route(current_user: dict = Depends(get_current_user)):
+    return {"user_id": current_user["user_id"]}
+
+# Require specific role
+@app.post("/admin-only")
+async def admin_route(current_user: dict = Depends(require_role("admin"))):
+    return {"message": "Admin access granted"}
+```
+
+---
+
+## Kong Gateway Testing Standard
+
+### ⚠️ MANDATORY: All Testing Through Kong
+
+**Never test services directly on their ports!**
+
+```bash
+# ❌ WRONG - Bypasses Kong
+curl http://localhost:8001/charters
+curl http://localhost:8013/analytics/revenue
+
+# ✅ CORRECT - Through Kong Gateway
+curl http://localhost:8080/api/v1/charters/charters
+curl http://localhost:8080/api/v1/analytics/revenue
+```
+
+### Kong Route Registration
+
+Every service MUST be registered:
+
+```bash
+# 1. Register service
+curl -X POST http://localhost:8081/services \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "service-name",
+    "host": "service-name",  # Docker service name
+    "port": 8000,
+    "protocol": "http"
+  }'
+
+# 2. Register route
+curl -X POST http://localhost:8081/services/service-name/routes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "service-route",
+    "paths": ["/api/v1/service-name"],
+    "strip_path": true  # REQUIRED!
+  }'
+```
+
+### Testing Pattern
+
+```bash
+# Standard test script pattern
+#!/bin/bash
+
+# Kong Gateway Base URL
+BASE_URL="http://localhost:8080/api/v1"
+
+# Authenticate
+TOKEN=$(curl -s -X POST "$BASE_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"admin123"}' \
+  | jq -r '.access_token')
+
+# Test endpoint
+curl -X GET "$BASE_URL/service/endpoint" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Verification Checklist
+
+Before marking any feature complete:
+
+- [ ] Service registered with Kong
+- [ ] Route configured with `strip_path: true`
+- [ ] Health endpoint accessible via Kong
+- [ ] All endpoints work through Kong
+- [ ] Test script uses Kong URLs only
+- [ ] Comprehensive tests pass through Kong
+
+---
+
+## Lessons Learned
+
+### 1. Kong Gateway is Non-Negotiable
+
+**Issue:** Phases 1 and 6 initially bypassed Kong, causing architecture validation gaps.
+
+**Solution:** Created `test_all_phases_kong.sh` to validate all services through gateway.
+
+**Learning:** Test production architecture from day one. Direct port access won't exist in production.
+
+### 2. Shared Database Works Well
+
+**Decision:** All services use shared `athena` database with separate schemas.
+
+**Benefits:**
+- Consistent with existing architecture
+- Simplified backup/restore
+- Easy cross-service queries when needed
+- Single connection pool configuration
+
+**Best Practice:** Use schema-qualified table names in cross-service queries.
+
+### 3. FastAPI is Excellent for Microservices
+
+**Strengths:**
+- Auto-generated OpenAPI docs
+- Built-in validation via Pydantic
+- Excellent async support
+- Fast development
+
+**Gotchas:**
+- Must explicitly handle SQLAlchemy sessions
+- Need careful CORS configuration
+- Schema search path critical for shared DB
+
+### 4. Start with API, Add UI Later
+
+**Approach:** Build complete backend APIs first, test through admin UI, then build role-specific portals.
+
+**Benefits:**
+- Backend fully functional before UI constraints
+- Can test all workflows through Postman/curl
+- UI becomes pure presentation layer
+- Multiple UIs can share same backend
+
+### 5. Testing Standards Prevent Rework
+
+**Requirements:**
+- >80% test coverage for new code
+- All endpoints tested through Kong
+- Integration tests for cross-service workflows
+- Documented examples in test scripts
+
+**Time Saved:** Caught Kong routing issues early, prevented production deployment problems.
+
+### 6. Incremental Deployment Works
+
+**Pattern:** Build service → Test via curl → Add admin UI → Test workflow → Deploy
+
+**Success:** Deployed 13 services incrementally without major issues.
+
+### 7. Documentation is Development, Not Overhead
+
+**Practice:** Write API docs and schemas before implementation.
+
+**Benefits:**
+- Clarifies requirements
+- Provides implementation guide
+- Enables parallel work
+- Creates testing checklist
+
+---
+
+## Development Workflow
+
+### For Each New Feature
+
+1. **Plan**
+   - Review requirements from client needs
+   - Identify affected services
+   - Design database schema changes
+   - Define API endpoints needed
+
+2. **Implement Backend**
+   - Update models (if needed)
+   - Create/update schemas
+   - Implement business logic
+   - Add API endpoints
+   - Register with Kong
+
+3. **Test Backend**
+   - Write unit tests
+   - Test via curl through Kong
+   - Verify all CRUD operations
+   - Test error cases
+   - Document examples
+
+4. **Admin UI (Later)**
+   - Create UI components
+   - Wire to backend APIs
+   - Manual testing
+   - User acceptance testing
+
+5. **Document**
+   - Update API documentation
+   - Add examples to README
+   - Update implementation plan
+   - Mark phase complete
+
+### Code Review Checklist
+
+- [ ] Follows service architecture pattern
+- [ ] Uses correct database schema
+- [ ] All endpoints require appropriate auth
+- [ ] Pydantic schemas for request/response
+- [ ] Error handling with proper status codes
+- [ ] Logged important operations
+- [ ] Kong route registered
+- [ ] Tests pass through Kong
+- [ ] Documentation updated
+
+---
+
+## Testing Strategy
+
+### Backend Testing Pyramid
+
+```
+        /\
+       /  \  E2E Tests (10%)
+      /____\    - test_all_phases_kong.sh
+     /      \   - Complete workflows
+    / Integra\ Integration Tests (20%)
+   /___________\  - Cross-service calls
+  /             \
+ /  Unit Tests   \ Unit Tests (70%)
+/__________________\ - Individual functions
+                     - Database queries
+                     - Business logic
+```
+
+### Test Categories
+
+**1. Unit Tests (pytest)**
+```bash
+cd backend/services/{service}
+pytest tests/ -v --cov=app --cov-report=html
+```
+
+**2. Integration Tests**
+- Cross-service communication
+- Database transactions
+- External API calls (Stripe, SendGrid)
+
+**3. E2E Tests**
+- Complete user workflows
+- Kong Gateway routing
+- Authentication flows
+- Data consistency
+
+### Comprehensive Test Suite
+
+```bash
+# Test all services through Kong
+./test_all_phases_kong.sh
+
+# Individual phase tests
+./test_payment_service.sh
+./test_analytics_service.sh
+# ... etc
+```
+
+---
+
+## Docker Compose Integration
+
+### Adding New Services
+
+```yaml
+# docker-compose.yml pattern
+service-name:
+  build: ./backend/services/service-name
+  container_name: service-name
+  environment:
+    - DATABASE_URL=postgresql://athena:athena123@postgres:5432/athena
+    - REDIS_URL=redis://redis:6379/0
+    - JWT_SECRET=${JWT_SECRET}
+  ports:
+    - "800X:8000"  # X = unique port number
+  depends_on:
+    - postgres
+    - redis
+  networks:
+    - athena-network
+  restart: unless-stopped
+```
+
+### Service Startup Order
+
+1. postgres (database)
+2. redis (cache)
+3. mongodb (documents)
+4. kong (API gateway)
+5. All application services (order doesn't matter)
+
+---
+
+## Common Commands
+
+### Development
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Restart specific service
+docker-compose restart service-name
+
+# View logs
+docker-compose logs -f service-name
+
+# Access database
+docker-compose exec postgres psql -U athena -d athena
+
+# Test Kong routes
+curl http://localhost:8081/routes | jq
+```
+
+### Testing
+
+```bash
+# Run comprehensive tests
+./test_all_phases_kong.sh
+
+# Test specific service
+./test_analytics_service.sh
+
+# Check Kong health
+curl http://localhost:8081/status
+```
+
+### Database
+
+```bash
+# Access service schema
+docker-compose exec postgres psql -U athena -d athena
+\c athena
+SET search_path TO service_schema, public;
+\dt  # List tables
+
+# Backup database
+docker-compose exec postgres pg_dump -U athena athena > backup.sql
+
+# Restore database
+docker-compose exec -T postgres psql -U athena athena < backup.sql
+```
+
+---
+
+## Environment Variables
+
+### Required for All Services
+
+```env
+# .env file
+DATABASE_URL=postgresql://athena:athena123@postgres:5432/athena
+REDIS_URL=redis://redis:6379/0
+JWT_SECRET=your-secret-key-here
+JWT_ALGORITHM=HS256
+```
+
+### Service-Specific
+
+```env
+# Payment Service
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+# Notification Service
+SENDGRID_API_KEY=SG...
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+
+# QuickBooks Integration (future)
+QUICKBOOKS_CLIENT_ID=...
+QUICKBOOKS_CLIENT_SECRET=...
+```
+
+---
+
+## Next Steps
+
+1. **Review Phase 1** - Financial Foundation implementation plan
+2. **Begin Implementation** - Start with AR/AP aging reports
+3. **Test Continuously** - Every endpoint through Kong Gateway
+4. **Document Progress** - Update this README as phases complete
+
+---
+
+## Questions or Issues?
+
+- Review phase-specific documentation
+- Check existing service implementations for patterns
+- Consult [KONG_TESTING_STANDARD.md](../KONG_TESTING_STANDARD.md)
+- Refer to [BACKEND_GAP_REVIEW.md](../BACKEND_GAP_REVIEW.md) for requirements
+
+---
+
+**Last Updated:** February 2, 2026  
+**Status:** Ready for Phase 1 implementation

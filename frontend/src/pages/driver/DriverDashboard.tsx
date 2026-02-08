@@ -65,7 +65,7 @@ export default function DriverDashboard() {
     try {
       setLoading(true)
       // Get current user's assigned charter
-      const response = await api.get('/api/v1/charters/charters/driver/my-charter')
+      const response = await api.get('/api/v1/charters/driver/my-charter')
       if (response.data) {
         setCharter(response.data)
         setNotes(response.data.vendor_notes || '')
@@ -86,7 +86,7 @@ export default function DriverDashboard() {
     
     try {
       setSaving(true)
-      await api.patch(`/api/v1/charters/charters/${charter.id}/driver-notes`, {
+      await api.patch(`/api/v1/charters/${charter.id}/driver-notes`, {
         vendor_notes: notes
       })
       alert('Notes saved successfully')
@@ -108,7 +108,7 @@ export default function DriverDashboard() {
     setCurrentLocation(locationStr)
     
     try {
-      await api.patch(`/api/v1/charters/charters/${charter.id}/location`, {
+      await api.patch(`/api/v1/charters/${charter.id}/location`, {
         location: locationStr,
         timestamp: new Date().toISOString()
       })

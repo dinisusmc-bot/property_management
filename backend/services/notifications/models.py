@@ -79,3 +79,43 @@ class NotificationTemplate(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ============================================================================
+# Phase 7: SMS Preferences Model
+# ============================================================================
+
+class SMSPreference(Base):
+    """SMS preferences and opt-out tracking"""
+    __tablename__ = "sms_preferences"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String(20), unique=True, nullable=False, index=True)
+    opted_out = Column(Boolean, default=False, index=True)
+    opted_out_at = Column(DateTime)
+    opt_out_reason = Column(String(255))
+    preferences = Column(Text)  # JSON string
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ============================================================================
+# Phase 7: Email Tracking Model
+# ============================================================================
+
+class EmailTracking(Base):
+    """Email open and click tracking"""
+    __tablename__ = "email_tracking"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email_log_id = Column(Integer)  # FK to email_logs table
+    tracking_token = Column(String(255), unique=True, nullable=False, index=True)
+    opened = Column(Boolean, default=False, index=True)
+    opened_at = Column(DateTime)
+    open_count = Column(Integer, default=0)
+    clicked = Column(Boolean, default=False, index=True)
+    clicked_at = Column(DateTime)
+    click_count = Column(Integer, default=0)
+    user_agent = Column(Text)
+    ip_address = Column(String(45))
+    created_at = Column(DateTime, default=datetime.utcnow)

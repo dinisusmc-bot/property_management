@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict
 from datetime import datetime, date
 from enum import Enum
+from decimal import Decimal
 
 
 # Enums (matching models.py)
@@ -429,3 +430,68 @@ class BidComparison(BaseModel):
     highest_bid: Optional[float]
     average_bid: Optional[float]
     bids: List[BidResponse]
+
+# ============================================================================
+# Vendor Document Schemas (COI Tracking)
+# ============================================================================
+
+class VendorDocumentBase(BaseModel):
+    """Base schema for vendor document"""
+    document_type: str = Field(..., description="Type: 'coi', 'license', 'dot_authority'")
+    document_id: Optional[int] = Field(None, description="Link to document service")
+    issue_date: Optional[date] = None
+    expiry_date: date
+    notes: Optional[str] = None
+
+
+class VendorDocumentCreate(VendorDocumentBase):
+    """Schema for creating a vendor document"""
+    pass
+
+
+class VendorDocumentResponse(VendorDocumentBase):
+    """Schema for vendor document response"""
+    id: int
+    vendor_id: int
+    status: str
+    days_until_expiry: Optional[int] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Vendor Performance Schemas
+# ============================================================================
+
+class PerformanceMetricCreate(BaseModel):
+    """Schema for creating a performance metric"""
+    charter_id: Optional[int] = None
+    metric_type: str = Field(..., description="Type: 'on_time', 'cancellation', 'rating'")
+    value: Decimal = Field(..., description="1/0 for boolean metrics, 1-5 for ratings")
+    notes: Optional[str] = None
+
+
+class PerformanceMetricResponse(BaseModel):
+    """Schema for performance metric response"""
+    id: int
+    vendor_id: int
+    charter_id: Optional[int]
+    metric_type: str
+    value: Decimal
+    notes: Optional[str]
+    recorded_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class VendorPerformanceSummary(BaseModel):
+    """Schema for vendor performance summary"""
+    vendor_id: int
+    total_trips: int
+    on_time_percentage: Optional[Decimal]
+    cancellation_count: int
+    average_rating: Optional[Decimal]
+    last_updated: datetime

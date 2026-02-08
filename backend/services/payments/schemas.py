@@ -61,6 +61,52 @@ class RefundResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================================================
+# Saved Payment Methods Schemas
+# ============================================================================
+
+class PaymentMethodBase(BaseModel):
+    """Base schema for payment method."""
+    nickname: Optional[str] = None
+    is_default: bool = False
+
+class PaymentMethodCreate(PaymentMethodBase):
+    """Create new payment method."""
+    stripe_token: str  # Stripe token from frontend (tok_xxx)
+
+class PaymentMethodUpdate(BaseModel):
+    """Update payment method settings."""
+    nickname: Optional[str] = None
+    is_default: Optional[bool] = None
+
+class PaymentMethodResponse(PaymentMethodBase):
+    """Payment method response."""
+    id: int
+    client_id: int
+    stripe_payment_method_id: str
+    
+    # Card details
+    card_brand: Optional[str]
+    card_last4: Optional[str]
+    card_exp_month: Optional[int]
+    card_exp_year: Optional[int]
+    
+    # Metadata
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class ChargePaymentMethodRequest(BaseModel):
+    """Request to charge a saved payment method."""
+    payment_method_id: int
+    amount: float
+    description: str
+    charter_id: Optional[int] = None
+
 class WebhookEvent(BaseModel):
     type: str
     data: Dict[str, Any]

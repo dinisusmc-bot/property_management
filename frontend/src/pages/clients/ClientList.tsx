@@ -41,7 +41,7 @@ export default function ClientList() {
   const fetchClients = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/api/v1/clients/clients')
+      const response = await api.get('/api/v1/clients')
       setClients(response.data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load clients')

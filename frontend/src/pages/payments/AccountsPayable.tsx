@@ -76,7 +76,7 @@ export default function AccountsPayable() {
     try {
       setLoading(true)
       const [chartersResponse, paymentsResponse, vendorsResponse] = await Promise.all([
-        api.get('/api/v1/charters/charters'),
+        api.get('/api/v1/charters'),
         api.get('/api/v1/charters/vendor-payments'),
         api.get('/api/v1/auth/vendors')
       ])

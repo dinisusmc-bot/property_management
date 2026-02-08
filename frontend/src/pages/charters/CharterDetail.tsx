@@ -43,11 +43,17 @@ import {
   Check as CheckIcon,
   CloudUpload as UploadIcon,
   Download as DownloadIcon,
-  InsertDriveFile as FileIcon
+  InsertDriveFile as FileIcon,
+  ContentCopy as CopyIcon,
+  Repeat as RepeatIcon,
+  BookmarkAdd as TemplateIcon
 } from '@mui/icons-material'
 import api from '../../services/api'
 import { useAuthStore } from '../../store/authStore'
 import DocumentUploadDialog from '../../components/DocumentUploadDialog'
+import { CloneCharterDialog } from '../../features/charter-templates/components/CloneCharterDialog'
+import { RecurringCharterDialog } from '../../features/charter-templates/components/RecurringCharterDialog'
+import { SaveAsTemplateDialog } from '../../features/charter-templates/components/SaveAsTemplateDialog'
 
 interface Vehicle {
   id: number
@@ -160,6 +166,11 @@ export default function CharterDetail() {
   const [approvalAmount, setApprovalAmount] = useState('')
   const [bookingCost, setBookingCost] = useState('')
   const [selectedVendorId, setSelectedVendorId] = useState<number | ''>('')
+  
+  // Template and cloning dialogs
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false)
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -173,7 +184,7 @@ export default function CharterDetail() {
   const fetchCharter = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/api/v1/charters/charters/${id}`)
+      const response = await api.get(`/api/v1/charters/${id}`)
       setCharter(response.data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load charter')
@@ -249,7 +260,7 @@ export default function CharterDetail() {
   const handleDelete = async () => {
     try {
       setDeleting(true)
-      await api.delete(`/api/v1/charters/charters/${id}`)
+      await api.delete(`/api/v1/charters/${id}`)
       navigate('/charters')
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete charter')
@@ -300,7 +311,7 @@ export default function CharterDetail() {
         updates.approval_status = 'pending'
       }
       
-      await api.put(`/api/v1/charters/charters/${id}`, updates)
+      await api.put(`/api/v1/charters/${id}`, updates)
       
       fetchCharter() // Refresh to show updated status
       fetchDocuments() // Refresh documents list
@@ -334,7 +345,7 @@ export default function CharterDetail() {
         updates.vendor_id = selectedVendorId
       }
       
-      await api.put(`/api/v1/charters/charters/${id}`, updates)
+      await api.put(`/api/v1/charters/${id}`, updates)
       
       fetchCharter()
       fetchDocuments()
@@ -356,7 +367,7 @@ export default function CharterDetail() {
     
     try {
       // Update charter status to confirmed
-      await api.put(`/api/v1/charters/charters/${id}`, {
+      await api.put(`/api/v1/charters/${id}`, {
         status: 'confirmed',
         confirmation_status: 'sent',
         confirmed_at: new Date().toISOString()
@@ -375,7 +386,7 @@ export default function CharterDetail() {
     
     try {
       // Update charter status to approved and set approval status
-      await api.put(`/api/v1/charters/charters/${id}`, {
+      await api.put(`/api/v1/charters/${id}`, {
         status: 'approved',
         approval_status: 'approved',
         quote_signed_date: new Date().toISOString()
@@ -394,7 +405,7 @@ export default function CharterDetail() {
     if (!location) return
 
     try {
-      await api.post(`/api/v1/charters/charters/${id}/checkin`, {
+      await api.post(`/api/v1/charters/${id}/checkin`, {
         location,
         checkin_time: new Date().toISOString()
       })
@@ -469,7 +480,7 @@ export default function CharterDetail() {
       updateData.client_total_charge = clientTotalCharge
       updateData.profit_margin = profitMargin
       
-      await api.put(`/api/v1/charters/charters/${id}`, updateData)
+      await api.put(`/api/v1/charters/${id}`, updateData)
       
       // Delete removed stops (original stops not in editedStops)
       const originalStopIds = charter?.stops?.map(s => s.id) || []
@@ -504,7 +515,7 @@ export default function CharterDetail() {
         } else {
           // Create new stop
           try {
-            await api.post(`/api/v1/charters/charters/${id}/stops`, stopData)
+            await api.post(`/api/v1/charters/${id}/stops`, stopData)
           } catch (err) {
             console.error('Failed to create stop', err)
           }
@@ -697,6 +708,27 @@ export default function CharterDetail() {
                 onClick={handleEdit}
               >
                 Edit
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<CopyIcon />}
+                onClick={() => setCloneDialogOpen(true)}
+              >
+                Clone
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RepeatIcon />}
+                onClick={() => setRecurringDialogOpen(true)}
+              >
+                Recurring
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<TemplateIcon />}
+                onClick={() => setTemplateDialogOpen(true)}
+              >
+                Save as Template
               </Button>
               {currentUser?.is_superuser && (
                 <Button
@@ -1668,6 +1700,32 @@ export default function CharterDetail() {
         documentType="approval"
         title="Upload Executed Approval Document"
       />
+
+      {/* Clone and Template Dialogs */}
+      {charter && (
+        <>
+          <CloneCharterDialog
+            open={cloneDialogOpen}
+            onClose={() => setCloneDialogOpen(false)}
+            charterId={charter.id}
+            currentTripDate={charter.trip_date}
+          />
+
+          <RecurringCharterDialog
+            open={recurringDialogOpen}
+            onClose={() => setRecurringDialogOpen(false)}
+            charterId={charter.id}
+            clientId={charter.client_id}
+            currentTripDate={charter.trip_date}
+          />
+
+          <SaveAsTemplateDialog
+            open={templateDialogOpen}
+            onClose={() => setTemplateDialogOpen(false)}
+            charterId={charter.id}
+          />
+        </>
+      )}
     </Box>
   )
 }

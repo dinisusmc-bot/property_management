@@ -12,35 +12,51 @@ else
     exit 1
 fi
 
-# Check auth service
-if curl -s -f http://localhost:8000/docs >/dev/null 2>&1; then
-    echo "✓ Auth service (port 8000) is running"
+# Check Kong gateway
+if curl -s -f http://localhost:8080 >/dev/null 2>&1; then
+    echo "✓ Kong gateway (port 8080) is running"
 else
-    echo "✗ Auth service not responding"
+    echo "✗ Kong gateway not responding"
     exit 1
 fi
 
-# Check charter service  
-if curl -s -f http://localhost:8001/docs >/dev/null 2>&1; then
-    echo "✓ Charter service (port 8001) is running"
+# Check auth service via Kong
+if curl -s -f http://localhost:8080/api/v1/auth/health >/dev/null 2>&1; then
+    echo "✓ Auth service is running via Kong"
 else
-    echo "✗ Charter service not responding"
+    echo "✗ Auth service not responding via Kong"
     exit 1
 fi
 
-# Check client service
-if curl -s -f http://localhost:8002/docs >/dev/null 2>&1; then
-    echo "✓ Client service (port 8002) is running"
+# Check charter service via Kong
+if curl -s -f http://localhost:8080/api/v1/charters/health >/dev/null 2>&1; then
+    echo "✓ Charter service is running via Kong"
 else
-    echo "✗ Client service not responding"
+    echo "✗ Charter service not responding via Kong"
     exit 1
 fi
 
-# Check document service
-if curl -s -f http://localhost:8003/docs >/dev/null 2>&1; then
-    echo "✓ Document service (port 8003) is running"
+# Check client service via Kong
+if curl -s -f http://localhost:8080/api/v1/clients/health >/dev/null 2>&1; then
+    echo "✓ Client service is running via Kong"
 else
-    echo "✗ Document service not responding"
+    echo "✗ Client service not responding via Kong"
+    exit 1
+fi
+
+# Check sales service via Kong
+if curl -s -f http://localhost:8080/api/v1/sales/health >/dev/null 2>&1; then
+    echo "✓ Sales service is running via Kong"
+else
+    echo "✗ Sales service not responding via Kong"
+    exit 1
+fi
+
+# Check pricing service via Kong
+if curl -s -f http://localhost:8080/api/v1/pricing/health >/dev/null 2>&1; then
+    echo "✓ Pricing service is running via Kong"
+else
+    echo "✗ Pricing service not responding via Kong"
     exit 1
 fi
 

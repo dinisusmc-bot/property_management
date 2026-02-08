@@ -1,16 +1,23 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import func
+from typing import List, Optional
+from datetime import date
 from database import get_db, engine, Base
-from models import Notification, NotificationTemplate
+from models import Notification, NotificationTemplate, SMSPreference, EmailTracking
 from schemas import (
     NotificationCreate, NotificationResponse,
-    TemplateCreate, TemplateResponse
+    TemplateCreate, TemplateResponse,
+    SMSOptOutRequest, SMSOptInRequest, SMSOptOutResponse, SMSOptStatusResponse,
+    EmailTrackingStats, EmailTrackingResponse
 )
 from notification_service import NotificationService
 from config import settings
 import threading
 from rabbitmq_consumer import start_consumer
+from datetime import datetime
+import secrets
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -136,6 +143,198 @@ def update_template(template_name: str, template_data: TemplateCreate, db: Sessi
     db.commit()
     db.refresh(template)
     return template
+
+
+# ============================================================================
+# Phase 7: SMS Preferences Endpoints
+# ============================================================================
+
+def normalize_phone(phone: str) -> str:
+    """Normalize phone number by removing spaces and dashes"""
+    return phone.strip().replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+
+
+@app.post("/sms/opt-out", response_model=SMSOptOutResponse)
+async def sms_opt_out(
+    request: SMSOptOutRequest,
+    db: Session = Depends(get_db)
+):
+    """Opt-out from SMS notifications"""
+    phone = normalize_phone(request.phone_number)
+    
+    preference = db.query(SMSPreference).filter(
+        SMSPreference.phone_number == phone
+    ).first()
+    
+    if preference:
+        preference.opted_out = True
+        preference.opted_out_at = datetime.utcnow()
+        preference.opt_out_reason = request.reason
+        preference.updated_at = datetime.utcnow()
+    else:
+        preference = SMSPreference(
+            phone_number=phone,
+            opted_out=True,
+            opted_out_at=datetime.utcnow(),
+            opt_out_reason=request.reason
+        )
+        db.add(preference)
+    
+    db.commit()
+    
+    return SMSOptOutResponse(
+        phone_number=phone,
+        opted_out=True,
+        message="Successfully opted out of SMS notifications"
+    )
+
+
+@app.post("/sms/opt-in", response_model=SMSOptOutResponse)
+async def sms_opt_in(
+    request: SMSOptInRequest,
+    db: Session = Depends(get_db)
+):
+    """Opt-in to SMS notifications"""
+    phone = normalize_phone(request.phone_number)
+    
+    preference = db.query(SMSPreference).filter(
+        SMSPreference.phone_number == phone
+    ).first()
+    
+    if preference:
+        preference.opted_out = False
+        preference.opted_out_at = None
+        preference.opt_out_reason = None
+        preference.updated_at = datetime.utcnow()
+    else:
+        preference = SMSPreference(
+            phone_number=phone,
+            opted_out=False
+        )
+        db.add(preference)
+    
+    db.commit()
+    
+    return SMSOptOutResponse(
+        phone_number=phone,
+        opted_out=False,
+        message="Successfully opted in to SMS notifications"
+    )
+
+
+@app.get("/sms/check-opt-out/{phone_number}", response_model=SMSOptStatusResponse)
+async def check_sms_opt_out(
+    phone_number: str,
+    db: Session = Depends(get_db)
+):
+    """Check if phone number has opted out"""
+    phone = normalize_phone(phone_number)
+    
+    preference = db.query(SMSPreference).filter(
+        SMSPreference.phone_number == phone
+    ).first()
+    
+    if not preference:
+        return SMSOptStatusResponse(
+            phone_number=phone,
+            opted_out=False
+        )
+    
+    return SMSOptStatusResponse(
+        phone_number=phone,
+        opted_out=preference.opted_out,
+        opted_out_at=preference.opted_out_at.isoformat() if preference.opted_out_at else None,
+        reason=preference.opt_out_reason
+    )
+
+
+# ============================================================================
+# Phase 7: Email Tracking Endpoints
+# ============================================================================
+
+def generate_tracking_token() -> str:
+    """Generate unique tracking token"""
+    return secrets.token_urlsafe(32)
+
+
+@app.get("/track/open/{tracking_token}")
+async def track_email_open(
+    tracking_token: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Track email open via pixel"""
+    tracking = db.query(EmailTracking).filter(
+        EmailTracking.tracking_token == tracking_token
+    ).first()
+    
+    if tracking:
+        if not tracking.opened:
+            tracking.opened = True
+            tracking.opened_at = datetime.utcnow()
+        
+        tracking.open_count += 1
+        tracking.ip_address = request.client.host if request.client else None
+        tracking.user_agent = request.headers.get('user-agent')
+        
+        db.commit()
+    
+    # Return 1x1 transparent GIF pixel
+    pixel_data = bytes.fromhex('47494638396101000100800000ffffff00000021f90401000000002c00000000010001000002024401003b')
+    return Response(content=pixel_data, media_type="image/gif")
+
+
+@app.get("/track/stats", response_model=EmailTrackingStats)
+async def get_email_tracking_stats(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Get email tracking statistics"""
+    query = db.query(EmailTracking)
+    
+    if start_date:
+        query = query.filter(EmailTracking.created_at >= start_date)
+    if end_date:
+        query = query.filter(EmailTracking.created_at <= end_date)
+    
+    all_emails = query.all()
+    total = len(all_emails)
+    opened = len([e for e in all_emails if e.opened])
+    clicked = len([e for e in all_emails if e.clicked])
+    
+    return EmailTrackingStats(
+        total_emails=total,
+        opened=opened,
+        clicked=clicked,
+        open_rate=(opened / total * 100) if total > 0 else 0,
+        click_rate=(clicked / total * 100) if total > 0 else 0
+    )
+
+
+@app.get("/track/{tracking_token}", response_model=EmailTrackingResponse)
+async def get_tracking_details(
+    tracking_token: str,
+    db: Session = Depends(get_db)
+):
+    """Get details for a specific tracking token"""
+    tracking = db.query(EmailTracking).filter(
+        EmailTracking.tracking_token == tracking_token
+    ).first()
+    
+    if not tracking:
+        raise HTTPException(status_code=404, detail="Tracking token not found")
+    
+    return EmailTrackingResponse(
+        tracking_token=tracking.tracking_token,
+        opened=tracking.opened,
+        opened_at=tracking.opened_at.isoformat() if tracking.opened_at else None,
+        open_count=tracking.open_count,
+        clicked=tracking.clicked,
+        clicked_at=tracking.clicked_at.isoformat() if tracking.clicked_at else None,
+        click_count=tracking.click_count
+    )
+
 
 if __name__ == "__main__":
     import uvicorn

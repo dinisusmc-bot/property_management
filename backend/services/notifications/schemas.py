@@ -51,3 +51,53 @@ class TemplateResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Phase 7: SMS Preferences Schemas
+# ============================================================================
+
+class SMSOptOutRequest(BaseModel):
+    phone_number: str
+    reason: Optional[str] = "User request"
+
+
+class SMSOptInRequest(BaseModel):
+    phone_number: str
+
+
+class SMSOptOutResponse(BaseModel):
+    phone_number: str
+    opted_out: bool
+    message: str
+
+
+class SMSOptStatusResponse(BaseModel):
+    phone_number: str
+    opted_out: bool
+    opted_out_at: Optional[str] = None
+    reason: Optional[str] = None
+
+
+# ============================================================================
+# Phase 7: Email Tracking Schemas
+# ============================================================================
+
+class EmailTrackingStats(BaseModel):
+    """Schema for email tracking statistics"""
+    total_emails: int
+    opened: int
+    clicked: int
+    open_rate: float
+    click_rate: float
+
+
+class EmailTrackingResponse(BaseModel):
+    """Schema for email tracking response"""
+    tracking_token: str
+    opened: bool
+    opened_at: Optional[str] = None
+    open_count: int
+    clicked: bool
+    clicked_at: Optional[str] = None
+    click_count: int

@@ -1,10 +1,12 @@
 """
 Database models for Vendor Service
 """
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum, Date, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum, Date, JSON, Numeric
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 import enum
+from datetime import date as date_type, datetime
 
 
 # Enums
@@ -264,6 +266,55 @@ class VendorCompliance(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=True, onupdate=func.now())
     uploaded_by = Column(Integer, nullable=True)
+
+
+class VendorDocument(Base):
+    """Vendor documents for COI, licenses, and certifications tracking"""
+    __tablename__ = "vendor_documents"
+
+    # Primary Key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # References
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Document Information
+    document_type = Column(String(50), nullable=False)  # 'coi', 'license', 'dot_authority'
+    document_id = Column(Integer, nullable=True)  # Link to document service
+    
+    # Validity
+    issue_date = Column(Date, nullable=True)
+    expiry_date = Column(Date, nullable=False)
+    
+    # Status
+    status = Column(String(20), nullable=False, default="active")  # 'active', 'expired', 'expiring_soon'
+    notes = Column(Text, nullable=True)
+    uploaded_by = Column(Integer, nullable=True)
+    
+    # Audit
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class VendorPerformance(Base):
+    """Vendor performance tracking - on-time rate, cancellations, ratings"""
+    __tablename__ = "vendor_performance"
+
+    # Primary Key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # References
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False, index=True)
+    charter_id = Column(Integer, nullable=True)
+    
+    # Metric Information
+    metric_type = Column(String(50), nullable=False)  # 'on_time', 'cancellation', 'rating'
+    value = Column(Numeric(5, 2), nullable=False)  # Rating value or 1/0 for boolean metrics
+    notes = Column(Text, nullable=True)
+    
+    # Audit
+    recorded_at = Column(DateTime, nullable=False, server_default=func.now())
+    recorded_by = Column(Integer, nullable=True)
 
 
 class BidRequest(Base):

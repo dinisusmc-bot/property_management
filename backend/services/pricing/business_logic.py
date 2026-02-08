@@ -269,3 +269,90 @@ class PricingEngine:
         logger.info(f"Saved quote calculation {calculation.id}")
         
         return calculation
+
+
+class MultiVehiclePricingEngine:
+    """Multi-vehicle pricing calculation engine - Task 8.3"""
+    
+    @staticmethod
+    def calculate_multi_vehicle_pricing(
+        total_passengers: int,
+        total_miles: float,
+        vehicle_count: int,
+        vehicle_type: str,
+        estimated_hours: float,
+        base_rate_per_mile: float = None,
+        base_rate_per_hour: float = None
+    ) -> Dict:
+        """
+        Calculate pricing for multi-vehicle charter.
+        
+        Args:
+            total_passengers: Total passenger count
+            total_miles: Total miles for trip
+            vehicle_count: Number of vehicles needed
+            vehicle_type: Type of vehicle (e.g., "56_passenger")
+            estimated_hours: Estimated trip duration in hours
+            base_rate_per_mile: Override base rate per mile (optional)
+            base_rate_per_hour: Override base rate per hour (optional)
+            
+        Returns:
+            Dict with pricing breakdown per vehicle and total
+        """
+        # Use config defaults if not provided
+        if base_rate_per_mile is None:
+            base_rate_per_mile = config.BASE_RATE_PER_MILE
+        if base_rate_per_hour is None:
+            base_rate_per_hour = config.BASE_RATE_PER_HOUR
+        
+        # Calculate passengers per vehicle (distribute evenly)
+        passengers_per_vehicle = total_passengers // vehicle_count
+        remaining_passengers = total_passengers % vehicle_count
+        
+        # Calculate miles per vehicle (same for all vehicles)
+        miles_per_vehicle = total_miles
+        
+        # Calculate base cost per vehicle
+        mileage_cost_per_vehicle = miles_per_vehicle * base_rate_per_mile
+        hourly_cost_per_vehicle = estimated_hours * base_rate_per_hour
+        base_cost_per_vehicle = mileage_cost_per_vehicle + hourly_cost_per_vehicle
+        
+        # Total base cost
+        total_base_cost = base_cost_per_vehicle * vehicle_count
+        
+        # NOTE: No bulk discount applied per user requirement
+        # Each vehicle priced independently
+        
+        # Build vehicle breakdown
+        vehicles = []
+        for i in range(vehicle_count):
+            # Distribute remaining passengers to first vehicles
+            vehicle_passengers = passengers_per_vehicle + (1 if i < remaining_passengers else 0)
+            
+            vehicles.append({
+                "vehicle_number": i + 1,
+                "passengers": vehicle_passengers,
+                "miles": miles_per_vehicle,
+                "estimated_hours": estimated_hours,
+                "mileage_cost": round(mileage_cost_per_vehicle, 2),
+                "hourly_cost": round(hourly_cost_per_vehicle, 2),
+                "total_cost": round(base_cost_per_vehicle, 2)
+            })
+        
+        return {
+            "vehicle_count": vehicle_count,
+            "vehicle_type": vehicle_type,
+            "total_passengers": total_passengers,
+            "passengers_per_vehicle": passengers_per_vehicle,
+            "remaining_passengers": remaining_passengers,
+            "total_miles": miles_per_vehicle,
+            "estimated_hours": estimated_hours,
+            "base_rate_per_mile": base_rate_per_mile,
+            "base_rate_per_hour": base_rate_per_hour,
+            "mileage_cost_per_vehicle": round(mileage_cost_per_vehicle, 2),
+            "hourly_cost_per_vehicle": round(hourly_cost_per_vehicle, 2),
+            "base_cost_per_vehicle": round(base_cost_per_vehicle, 2),
+            "total_base_cost": round(total_base_cost, 2),
+            "vehicles": vehicles,
+            "notes": "No bulk discount applied. Each vehicle priced independently."
+        }

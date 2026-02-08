@@ -89,7 +89,7 @@ export default function ClientDetail() {
   const fetchClient = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/api/v1/clients/clients/${id}`)
+      const response = await api.get(`/api/v1/clients/${id}`)
       setClient(response.data)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load client')
@@ -101,7 +101,7 @@ export default function ClientDetail() {
   const fetchClientCharters = async () => {
     try {
       setLoadingCharters(true)
-      const response = await api.get('/api/v1/charters/charters', {
+      const response = await api.get('/api/v1/charters', {
         params: { client_id: id }
       })
       setCharters(response.data)

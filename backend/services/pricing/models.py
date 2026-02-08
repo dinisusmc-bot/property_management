@@ -1,7 +1,7 @@
 """
 Database models for Pricing Service
 """
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, Enum as SQLEnum, Numeric, ForeignKey, CheckConstraint, DECIMAL
 from sqlalchemy.sql import func
 from database import Base
 from enum import Enum
@@ -148,3 +148,167 @@ class PriceHistory(Base):
 
     def __repr__(self):
         return f"<PriceHistory Rule {self.rule_id} - {self.field_name}>"
+
+
+class Amenity(Base):
+    """Amenity model - charter add-ons like WiFi, drinks, etc."""
+    __tablename__ = "amenities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    price = Column(Float, nullable=False)
+    category = Column(String(50), nullable=True)  # entertainment, refreshments, comfort
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<Amenity {self.name} - ${self.price}>"
+
+
+class QuoteAmenity(Base):
+    """Quote amenity junction table - amenities added to quotes"""
+    __tablename__ = "quote_amenities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_id = Column(Integer, nullable=False, index=True)
+    amenity_id = Column(Integer, nullable=False, index=True)
+    quantity = Column(Integer, default=1)
+    price = Column(Float, nullable=False)  # Price at time of quote (frozen)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<QuoteAmenity quote={self.quote_id} amenity={self.amenity_id}>"
+
+
+class PromoCode(Base):
+    """Promotional code model - discount codes for marketing campaigns"""
+    __tablename__ = "promo_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    discount_type = Column(String(20), nullable=False)  # 'percentage' or 'fixed'
+    discount_value = Column(Float, nullable=False)
+    min_order_value = Column(Float, nullable=True)  # Minimum order to apply
+    max_discount = Column(Float, nullable=True)  # Max discount for percentage codes
+    valid_from = Column(Date, nullable=False, index=True)
+    valid_until = Column(Date, nullable=False, index=True)
+    usage_limit = Column(Integer, nullable=True)  # NULL = unlimited
+    usage_count = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_by = Column(Integer, nullable=True)
+
+    def __repr__(self):
+        return f"<PromoCode {self.code} - {self.discount_type}>"
+
+
+# ============================================================================
+# PHASE 4 TASK 4.3: Pricing Configuration System
+# ============================================================================
+
+class PricingModifier(Base):
+    """
+    Dynamic pricing modifiers for advanced pricing control - Phase 4 Task 4.3
+    Allows managers to configure pricing adjustments based on various conditions
+    """
+    __tablename__ = "pricing_modifiers"
+    __table_args__ = {'schema': 'pricing'}
+
+    id = Column(Integer, primary_key=True, index=True)
+    modifier_name = Column(String(100), nullable=False)
+    modifier_type = Column(String(50), nullable=False, index=True)  # seasonal, day_of_week, time_of_day, distance, passenger_count, event_type, custom
+    
+    # Condition logic
+    condition_field = Column(String(100), nullable=True)  # Field to evaluate
+    condition_operator = Column(String(20), nullable=True)  # equals, greater_than, less_than, in, between, etc.
+    condition_value = Column(String(255), nullable=True)  # Value to compare against
+    
+    # Adjustment
+    adjustment_type = Column(String(20), nullable=False)  # percentage, fixed_amount
+    adjustment_value = Column(Numeric(10, 2), nullable=False)  # Can be positive or negative
+    
+    # Priority and activation
+    priority = Column(Integer, default=0, index=True)  # Higher priority applied first
+    is_active = Column(Boolean, default=True, index=True)
+    
+    # Date range (for seasonal modifiers)
+    valid_from = Column(Date, nullable=True)
+    valid_until = Column(Date, nullable=True)
+    
+    # Metadata
+    notes = Column(Text, nullable=True)
+    created_by = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<PricingModifier {self.modifier_name} ({self.adjustment_type}: {self.adjustment_value})>"
+
+
+class PricingModifierLog(Base):
+    """
+    Audit trail of applied pricing modifiers - Phase 4 Task 4.3
+    Tracks when and how modifiers are applied to quotes/charters
+    """
+    __tablename__ = "pricing_modifier_log"
+    __table_args__ = {'schema': 'pricing'}
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_id = Column(Integer, nullable=True, index=True)
+    charter_id = Column(Integer, nullable=True, index=True)
+    modifier_id = Column(Integer, ForeignKey('pricing.pricing_modifiers.id'), nullable=False, index=True)
+    
+    base_price = Column(Numeric(10, 2), nullable=False)
+    adjusted_price = Column(Numeric(10, 2), nullable=False)
+    adjustment_amount = Column(Numeric(10, 2), nullable=False)
+    
+    applied_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    def __repr__(self):
+        return f"<PricingModifierLog modifier={self.modifier_id} amount={self.adjustment_amount}>"
+
+
+class GeocodingCache(Base):
+    """Cache for geocoded addresses - Task 8.2"""
+    __tablename__ = "geocoding_cache"
+    __table_args__ = (
+        CheckConstraint(
+            "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
+            name="valid_coordinates"
+        ),
+        {'schema': 'pricing'}
+    )
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Input address
+    address_text = Column(Text, nullable=False)
+    address_hash = Column(String(64), unique=True, nullable=False, index=True)
+    
+    # Geocoded location
+    latitude = Column(DECIMAL(10, 8))
+    longitude = Column(DECIMAL(11, 8))
+    formatted_address = Column(Text)
+    
+    # Address components
+    street_number = Column(String(50))
+    street_name = Column(String(200))
+    city = Column(String(100))
+    state = Column(String(50))
+    postal_code = Column(String(20))
+    country = Column(String(50))
+    
+    # Metadata
+    confidence_score = Column(DECIMAL(10, 4))  # TomTom returns values 0-100
+    geocoding_provider = Column(String(50), default='tomtom')
+    
+    # Audit
+    created_at = Column(DateTime, server_default=func.now())
+    last_used_at = Column(DateTime, server_default=func.now())
+    use_count = Column(Integer, default=1)
+    
+    def __repr__(self):
+        return f"<GeocodingCache {self.city}, {self.state} ({self.latitude}, {self.longitude})>"

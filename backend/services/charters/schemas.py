@@ -77,6 +77,7 @@ class CharterBase(BaseModel):
     trip_type: Optional[str] = None  # one-way, round-trip, multi-day
     requires_second_driver: bool = False
     vehicle_count: int = 1
+    is_multi_vehicle: bool = False
 
 class CharterCreate(CharterBase):
     """Schema for creating a charter"""
@@ -177,6 +178,9 @@ class CharterResponse(CharterBase):
     updated_at: Optional[datetime]
     vehicle: VehicleResponse
     stops: List[StopResponse] = []
+    # Phase 2.1: Multi-vehicle fields  
+    is_multi_vehicle: bool = False
+    total_vehicles: int = 1
     # Phase 2 Enhancement Fields
     parent_charter_id: Optional[int] = None
     quote_secure_token: Optional[str] = None
@@ -305,3 +309,210 @@ class CheckInRequest(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Phase 2.1: Multi-vehicle charter schemas
+class CharterVehicleBase(BaseModel):
+    """Base charter vehicle schema"""
+    vehicle_type_id: int
+    capacity: int
+    cost: float
+    pickup_location: Optional[str] = None
+    dropoff_location: Optional[str] = None
+    special_requirements: Optional[str] = None
+
+class CharterVehicleCreate(CharterVehicleBase):
+    """Schema for creating a charter vehicle"""
+    vehicle_id: Optional[int] = None
+    vendor_id: Optional[int] = None
+    status: str = "pending"
+
+class CharterVehicleUpdate(BaseModel):
+    """Schema for updating a charter vehicle"""
+    vehicle_id: Optional[int] = None
+    vendor_id: Optional[int] = None
+    capacity: Optional[int] = None
+    cost: Optional[float] = None
+    pickup_location: Optional[str] = None
+    dropoff_location: Optional[str] = None
+    special_requirements: Optional[str] = None
+    status: Optional[str] = None
+
+class CharterVehicleResponse(CharterVehicleBase):
+    """Schema for charter vehicle response"""
+    id: int
+    charter_id: int
+    vehicle_id: Optional[int]
+    vendor_id: Optional[int]
+    status: str
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class MultiVehicleCharterCreate(BaseModel):
+    """Schema for creating a multi-vehicle charter"""
+    client_id: int
+    trip_date: date
+    passengers: int
+    trip_hours: float
+    pickup_location: str
+    dropoff_location: str
+    event_type: Optional[str] = None
+    notes: Optional[str] = None
+    vehicles: List[CharterVehicleCreate] = Field(..., min_items=2, description="At least 2 vehicles required")
+    
+    class Config:
+        from_attributes = True
+
+class MultiVehicleCharterResponse(BaseModel):
+    """Schema for multi-vehicle charter creation response"""
+    charter_id: int
+    is_multi_vehicle: bool
+    total_vehicles: int
+    total_capacity: int
+    total_cost: float
+    vehicles: List[CharterVehicleResponse]
+    
+    class Config:
+        from_attributes = True
+
+# Phase 2.2: Charter Cloning & Templates
+class SaveAsTemplateRequest(BaseModel):
+    """Schema for saving charter as template"""
+    template_name: str
+    
+class CloneCharterRequest(BaseModel):
+    """Schema for cloning charter"""
+    trip_date: date
+    client_id: Optional[int] = None
+    overrides: Optional[dict] = None
+
+# Phase 2.3: Charter Series Management
+class CharterSeriesCreate(BaseModel):
+    """Schema for creating charter series"""
+    series_name: str
+    client_id: int
+    description: Optional[str] = None
+    recurrence_pattern: str  # daily, weekly, monthly
+    recurrence_days: Optional[str] = None  # For weekly: 'mon,wed,fri'
+    start_date: date
+    end_date: Optional[date] = None
+    template_charter_id: int
+    generate_charters: bool = False
+
+class CharterSeriesResponse(BaseModel):
+    """Schema for charter series response"""
+    id: int
+    series_name: str
+    client_id: int
+    description: Optional[str]
+    recurrence_pattern: str
+    recurrence_days: Optional[str]
+    start_date: date
+    end_date: Optional[date]
+    is_active: bool
+    created_at: datetime
+    charter_count: Optional[int] = 0
+    
+    class Config:
+        from_attributes = True
+
+# Phase 2.4: DOT Compliance Certifications
+class DOTCertificationCreate(BaseModel):
+    """Schema for creating DOT certification"""
+    certification_type: str
+    certification_number: str
+    issue_date: date
+    expiration_date: date
+    document_id: Optional[int] = None
+    notes: Optional[str] = None
+
+class DOTCertificationResponse(BaseModel):
+    """Schema for DOT certification response"""
+    id: int
+    vendor_id: int
+    certification_type: str
+    certification_number: str
+    issue_date: date
+    expiration_date: date
+    status: str
+    verified_by: Optional[int]
+    verified_at: Optional[datetime]
+    notes: Optional[str]
+    created_at: datetime
+    days_until_expiration: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Phase 7: Charter Splitting Schemas
+# ============================================================================
+
+class CharterLegCreate(BaseModel):
+    """Schema for a single leg in charter splitting"""
+    trip_date: date
+    passengers: int
+    notes: Optional[str] = None
+
+
+class CharterSplitRequest(BaseModel):
+    """Schema for splitting a charter into multiple legs"""
+    legs: List[CharterLegCreate] = Field(..., min_length=2, description="At least 2 legs required")
+
+
+class CharterLegResponse(BaseModel):
+    """Schema for a split charter leg response"""
+    id: int
+    sequence: int
+    trip_date: str
+    passengers: int
+    status: str
+    total_cost: float
+
+
+class CharterSplitResponse(BaseModel):
+    """Schema for charter split response"""
+    parent_charter_id: int
+    split_count: int
+    split_charters: List[CharterLegResponse]
+
+
+class CharterSplitListResponse(BaseModel):
+    """Schema for listing split charters"""
+    parent_charter_id: int
+    is_split: bool
+    split_count: int
+    split_charters: List[CharterLegResponse]
+
+
+# ============================================================================
+# Task 8.4: Secure Charter Share Link Schemas
+# ============================================================================
+
+class CharterShareLinkCreate(BaseModel):
+    """Create charter share link request"""
+    expires_hours: int = Field(168, ge=1, le=720, description="Hours until expiration (max 30 days)")
+    password: Optional[str] = Field(None, min_length=4, max_length=36, description="Optional password protection (max 36 chars)")
+
+
+class CharterShareLinkResponse(BaseModel):
+    """Charter share link response"""
+    link_id: int
+    token: str
+    url: str  # Full shareable URL
+    expires_at: datetime
+    has_password: bool
+    view_count: int
+    
+    class Config:
+        from_attributes = True
+
+
+class CharterShareLinkVerify(BaseModel):
+    """Verify charter share link request"""
+    token: str = Field(..., description="JWT token from link")
+    password: Optional[str] = Field(None, description="Password if link is protected")
+

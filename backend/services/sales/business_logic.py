@@ -108,7 +108,7 @@ class LeadConversionService:
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{config.CLIENT_SERVICE_URL}/api/v1/clients",
+                    f"{config.CLIENT_SERVICE_URL}/clients",
                     json=client_data,
                     timeout=10.0
                 )
@@ -126,8 +126,30 @@ class LeadConversionService:
             result["errors"].append(f"Client creation error: {str(e)}")
             return result
         
-        # Step 2: Create charter quote
+        # Step 2: Get default vehicle for charter
+        default_vehicle_id = 1  # Default to first vehicle
         try:
+            async with httpx.AsyncClient() as client:
+                # Try to get vehicles list
+                vehicles_response = await client.get(
+                    f"{config.CHARTER_SERVICE_URL}/vehicles",
+                    timeout=5.0
+                )
+                if vehicles_response.status_code == 200:
+                    vehicles = vehicles_response.json()
+                    if vehicles and len(vehicles) > 0:
+                        default_vehicle_id = vehicles[0].get("id", 1)
+        except Exception as e:
+            logger.warning(f"Could not fetch vehicles, using default: {e}")
+        
+        # Step 3: Create charter quote with required fields
+        try:
+            # Calculate basic pricing (simplified for lead conversion)
+            base_cost = 500.0  # Default base cost
+            mileage_cost = 100.0  # Default mileage estimate
+            additional_fees = 0.0
+            total_cost = base_cost + mileage_cost + additional_fees
+            
             charter_data = {
                 "client_id": result["client_id"],
                 "status": "quote",
@@ -136,12 +158,17 @@ class LeadConversionService:
                 "notes": lead.trip_details or "",
                 "trip_hours": 8,  # Default
                 "is_overnight": False,
-                "is_weekend": False
+                "is_weekend": False,
+                "vehicle_id": default_vehicle_id,
+                "base_cost": base_cost,
+                "mileage_cost": mileage_cost,
+                "additional_fees": additional_fees,
+                "total_cost": total_cost
             }
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{config.CHARTER_SERVICE_URL}/api/v1/charters",
+                    f"{config.CHARTER_SERVICE_URL}/charters",
                     json=charter_data,
                     timeout=10.0
                 )
