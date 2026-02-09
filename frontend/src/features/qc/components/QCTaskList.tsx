@@ -23,8 +23,7 @@ import {
   CircularProgress,
   Alert,
   Button,
-  Stack,
-  IconButton
+  Stack
 } from '@mui/material'
 import { useQCTasks } from '../hooks/useQcQuery'
 import { QCTaskStatus, QCTaskType, type QCTaskFilters } from '../types/qc.types'
