@@ -21,11 +21,15 @@ import {
   MenuItem,
   Grid,
   CircularProgress,
-  Alert
+  Alert,
+  Button,
+  Stack,
+  IconButton
 } from '@mui/material'
 import { useQCTasks } from '../hooks/useQcQuery'
 import { QCTaskStatus, QCTaskType, type QCTaskFilters } from '../types/qc.types'
 import { format, isPast } from 'date-fns'
+import { FilterList as FilterIcon, Add as AddIcon } from '@mui/icons-material'
 import type { QCTask } from '../types/qc.types'
 
 export default function QCTaskList() {
@@ -78,6 +82,22 @@ export default function QCTaskList() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">QC Tasks</Typography>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="contained"
+            startIcon={<FilterIcon />}
+            onClick={() => console.log('Filter clicked')}
+          >
+            Filter
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => console.log('Create task clicked')}
+          >
+            Create Task
+          </Button>
+        </Stack>
       </Box>
       
       {/* Filters */}
