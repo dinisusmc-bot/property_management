@@ -130,11 +130,6 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'echo "Using existing services - make sure ./start-all.sh is running"',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
-    timeout: 120 * 1000,
-  },
+  /* Skip webServer since we're testing against existing backend services */
+  webServer: false,
 });
