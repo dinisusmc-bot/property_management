@@ -29,6 +29,8 @@ import AccountsReceivable from './pages/payments/AccountsReceivable'
 import AccountsPayable from './pages/payments/AccountsPayable'
 import ChangeCasesPage from './pages/changes/ChangeCasesPage'
 import ChangeCaseCreatePage from './pages/changes/ChangeCaseCreatePage'
+import QCTaskListPage from './pages/qc/QCTaskListPage'
+import QCTaskDetailPage from './pages/qc/QCTaskDetailPage'
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -389,6 +391,33 @@ function App() {
               <Layout>
                 <NonVendorRoute>
                   <ChangeCaseCreatePage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* QC Task routes - protected from vendors */}
+        <Route
+          path="/qc-tasks"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <QCTaskListPage />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
+          path="/qc-tasks/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <QCTaskDetailPage />
                 </NonVendorRoute>
               </Layout>
             </ProtectedRoute>
