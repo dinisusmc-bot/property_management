@@ -13,6 +13,7 @@ const goToQCTasks = async (page: any) => {
   await page.goto('/qc-tasks');
   await page.waitForLoadState('domcontentloaded');
   await page.waitForURL('**/qc-tasks');
+  await page.waitForSelector('[role="heading"]', { timeout: 10000 });
 };
 
 const buildQCTaskPayload = (overrides: Record<string, any> = {}) => {
@@ -50,14 +51,16 @@ const createQCTask = async (request: any, overrides: Record<string, any> = {}) =
 test.describe('QC Task System - UI Display', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
-    await goToQCTasks(page);
+    await page.goto('/qc-tasks');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForSelector('[role="heading"]', { timeout: 10000 });
   });
 
   test('should display QC tasks list page with filters', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /qc tasks/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /filter/i })).toBeVisible();
-    await expect(page.getByText(/status/i)).toBeVisible();
-    await expect(page.getByText(/priority/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /qc tasks/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /filter/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/status/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/priority/i)).toBeVisible({ timeout: 10000 });
   });
 
   test('should display overdue tasks with warning styling', async ({ page }) => {
