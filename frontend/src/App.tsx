@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Box } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -31,6 +31,9 @@ import ChangeCasesPage from './pages/changes/ChangeCasesPage'
 import ChangeCaseCreatePage from './pages/changes/ChangeCaseCreatePage'
 import QCTaskListPage from './pages/qc/QCTaskListPage'
 import QCTaskDetailPage from './pages/qc/QCTaskDetailPage'
+import DispatchBoard from './features/dispatch/components/DispatchBoard'
+import VendorLogin from './features/vendor-portal/components/VendorLogin'
+import ClientLogin from './features/client-portal/components/ClientLogin'
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -60,6 +63,24 @@ function NonVendorRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/driver" replace />
   }
   return <>{children}</>
+}
+
+// Vendor route component - only allows vendors
+function VendorRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(state => state.user)
+  if (user?.role === 'vendor') {
+    return <>{children}</>
+  }
+  return <Navigate to="/" replace />
+}
+
+// Client route component - only allows clients
+function ClientRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(state => state.user)
+  if (user?.role === 'client') {
+    return <>{children}</>
+  }
+  return <Navigate to="/" replace />
 }
 
 function App() {
@@ -419,6 +440,58 @@ function App() {
                 <NonVendorRoute>
                   <QCTaskDetailPage />
                 </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Dispatch routes - protected from vendors */}
+        <Route
+          path="/dispatch"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NonVendorRoute>
+                  <DispatchBoard />
+                </NonVendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Vendor Portal routes */}
+        <Route
+          path="/vendor/login"
+          element={<VendorLogin />}
+        />
+        
+        <Route
+          path="/vendor/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <VendorRoute>
+                  <Typography variant="h4">Vendor Dashboard</Typography>
+                </VendorRoute>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Client Portal routes */}
+        <Route
+          path="/client/login"
+          element={<ClientLogin />}
+        />
+        
+        <Route
+          path="/client/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ClientRoute>
+                  <Typography variant="h4">Client Dashboard</Typography>
+                </ClientRoute>
               </Layout>
             </ProtectedRoute>
           }
