@@ -38,7 +38,7 @@ export default defineConfig({
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3002',
     
     /* Navigation timeout for SPAs - increased for high worker counts */
     navigationTimeout: 90 * 1000,
