@@ -1,8 +1,8 @@
 /**
  * Vendor Detail Page with Enhanced Features
  */
-import VendorDetail from '@/pages/vendors/VendorDetail'
+import EnhancedVendorDetail from '@/features/vendors/components/EnhancedVendorDetail'
 
 export default function EnhancedVendorDetailPage() {
-  return <VendorDetail />
+  return <EnhancedVendorDetail />
 }
