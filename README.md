@@ -1,11 +1,11 @@
-# Athena Charter Management System
+# 🏢 Property Management Platform
 
-**Modern microservices-based charter management platform** for US Coachways built with FastAPI, React, Apache Airflow, and comprehensive monitoring.
+**Multi-tenant property management system** for property owners, managers, and tenants — built with FastAPI, React, PostgreSQL, and Kong API Gateway.
 
-[![Test Status](https://img.shields.io/badge/tests-15%2F15%20passing-brightgreen)](docs/WORKFLOW_TEST_REPORT.md)
-[![Backend](https://img.shields.io/badge/backend-14%20services-blue)](#backend-services)
+[![Tests](https://img.shields.io/badge/tests-25%2B_passing-brightgreen)](docs/)
+[![Backend](https://img.shields.io/badge/backend-6_services-blue)](#backend-services)
+[![Frontend](https://img.shields.io/badge/frontend-React_18-green)](#frontend)
 [![API Gateway](https://img.shields.io/badge/Kong-configured-orange)](#api-gateway)
-[![Documentation](https://img.shields.io/badge/docs-complete-success)](docs/README.md)
 
 ---
 
@@ -20,271 +20,164 @@
 
 ```bash
 # Clone and navigate to project
-cd /path/to/coachway_demo
+cd ~/projects/property_management
 
-# Start all services (first run: ~2-3 minutes)
+# Start all services
 ./start-all.sh
+
+# Or use Docker Compose directly
+docker-compose -f docker-compose.staging.yml up -d
 ```
 
-The startup script will:
-- ✅ Start 20+ Docker containers (databases, microservices, monitoring)
-- ✅ Initialize Airflow database and create admin user
-- ✅ Configure Kong API Gateway routes
-- ✅ Seed database with sample data
-
-### Stop the System
-
-```bash
-./stop-all.sh
-```
-
----
-
-## 🌐 Access Points
+### Access Points
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Frontend** | http://localhost:3000 | admin@athena.com / admin123 |
-| **API Gateway** | http://localhost:8080/api/v1 | JWT Token required |
-| **Airflow** | http://localhost:8082 | admin / admin |
-| **Grafana** | http://localhost:3001 | admin / admin |
-| **Kong Admin** | http://localhost:8081 | N/A |
-
-### User Accounts
-- **Admin**: admin@athena.com / admin123
-- **Manager**: manager@athena.com / admin123
-- **Vendor**: vendor1@athena.com / admin123
-- **Driver**: driver1@athena.com / admin123
+| **Frontend** | http://localhost:3002 | admin@pm-demo.com / password |
+| **API Gateway (Kong)** | http://localhost:8080/api/v1 | JWT Token required |
+| **Owners Service** | http://localhost:8015 | - |
+| **Properties Service** | http://localhost:8016 | - |
+| **Units Service** | http://localhost:8017 | - |
+| **Tenants Service** | http://localhost:8018 | - |
+| **Maintenance Service** | http://localhost:8019 | - |
 
 ---
 
 ## 📚 Documentation
 
-- **[Project Structure](PROJECT_STRUCTURE.md)** - Complete system architecture
-- **[Frontend Integration Guide](docs/FRONTEND_INTEGRATION.md)** - Frontend development checklist
-- **[Documentation Index](docs/README.md)** - All documentation
-- **[Quick Start Guide](QUICKSTART.md)** - Detailed setup instructions
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
+- **[Architecture](docs/architecture.md)** - System design, hierarchy, RBAC
+- **[API Guide](docs/api-guide.md)** - All endpoints, request/response schemas
+- **[Deployment](docs/deployment.md)** - Docker, staging, production
+- **[Quick Start](docs/QUICKSTART.md)** - Setup instructions
+- **[Changelog](CHANGELOG.md)** - Version history
 
 ---
 
-## 🏗️ Backend Services
+## 🏗️ Core Hierarchy
 
-### Core Services (14 Microservices)
+```
+Owner (can own multiple Properties)
+   └── Property (belongs to one Owner)
+         └── Unit (belongs to one Property)
+               └── Tenant (Primary + Co-Tenants)
+```
+
+---
+
+## 👥 Roles & Capabilities
+
+### Admin / Manager
+- Full CRUD on owners, properties, units, tenants, maintenance
+- Process rent payments, deduct fees, payout net rents to owners
+- Review/approve maintenance requests & contractor bids
+- GAAP compliance: accrual accounting, audit trails
+- Analytics dashboards (occupancy, revenue, delinquency)
+
+### Property Owner
+- Manage owned properties/units: set rents, approve leases
+- Pay maintenance fees, receive payouts, view statements
+- Approve maintenance requests/bids (threshold-based auto-approve)
+- Per-property analytics: ROI, expenses, tax exports (1099s)
+
+### Tenant (Primary + Co-Tenants)
+- View/pay rent (autopay, partial, Stripe integration)
+- Submit maintenance requests (photos, urgency)
+- Access lease docs, payment history, unit details
+- In-app messaging with managers/owners/contractors
+
+### Maintenance / Contractor
+- Receive secure, time-limited links for bids/acceptance
+- View assigned jobs: details, photos, timelines
+- Update status, submit bids/invoices
+- Get paid via integrated payouts
+
+---
+
+## 🏗️ Backend Services (6 Services)
 
 | Port | Service | Purpose | Status |
 |------|---------|---------|--------|
-| 8000 | Auth | JWT authentication, RBAC, MFA | ✅ Production Ready |
-| 8001 | Charter | Charter operations & workflows | ✅ Production Ready |
-| 8002 | Client | Customer relationship management | ✅ Production Ready |
-| 8003 | Documents | Document storage & e-signatures | ✅ Production Ready |
-| 8004 | Payments | Payment processing & invoicing | ✅ Production Ready |
-| 8005 | Notifications | Multi-channel notifications | ✅ Production Ready |
-| 8007 | Pricing | Dynamic pricing engine | ✅ Production Ready |
-| 8008 | Vendor | Vendor & subcontractor management | ✅ Production Ready |
-| 8009 | Sales | Sales pipeline & lead tracking | ✅ Production Ready |
-| 8010 | Portals | Client/Vendor/Driver portals | ✅ Production Ready |
-| 8011 | Change Mgmt | Change orders & approvals | ✅ Production Ready |
-| 8012 | Dispatch | Driver assignment & tracking | ✅ Production Ready |
-| 8013 | Analytics | Business intelligence | ✅ Production Ready |
+| 8015 | owners | Property owner management | ✅ Production Ready |
+| 8016 | properties | Property CRUD & assignment | ✅ Production Ready |
+| 8017 | units | Unit management & status | ✅ Production Ready |
+| 8018 | tenants | Tenant profiles & leases | ✅ Production Ready |
+| 8019 | maintenance | Work orders & bids | ✅ Production Ready |
+| 8020 | leases | Lease templates & e-sign | 🚧 In Progress |
 
 **API Gateway**: All services accessible via Kong at `http://localhost:8080/api/v1`
 
 ---
 
-## 🧪 Test Status
+## 🎨 Frontend
 
-```
-✅ ALL SYSTEMS OPERATIONAL
-
-Integration Tests:  15/15 passing (100%)
-Data Validations:  20/20 passing (100%)
-Service Health:    14/14 healthy (100%)
-Kong Routes:       14/14 configured (100%)
-```
-
-Run full test suite:
-```bash
-python3 tests/integration/run_all_workflows.py
-```
-
-See [Test Report](docs/WORKFLOW_TEST_REPORT.md) for detailed results.
+- **Tech**: React 18 + TypeScript + Vite + MUI
+- **Theme**: Glassmorphism + dark mode
+- **Pages**: Dashboard, Owners, Properties, Units, Tenants, Maintenance, Leases
+- **API Integration**: React Query + Axios
 
 ---
 
-## 📁 Project Structure
+## 🔐 Authentication & Security
 
-```
-coachway_demo/
-├── backend/              # 14 FastAPI microservices
-│   ├── services/        # Individual service directories
-│   └── scripts/         # Database utilities
-├── frontend/            # React + TypeScript SPA
-│   └── src/            # Frontend source code
-├── airflow/            # Apache Airflow ETL workflows
-│   └── dags/           # Automated workflows
-├── monitoring/         # Grafana & Prometheus configs
-├── tests/              # Integration & E2E tests
-├── docs/               # Technical documentation
-├── PROJECT_STRUCTURE.md  # Complete architecture guide
-└── docker-compose.yml    # Service orchestration
-```
-
-**Full Architecture**: See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+- **JWT + MFA** (email-based 6-digit codes)
+- **Role-based access control** (RBAC)
+- **Row-level security** (RLS) in PostgreSQL
+- **Audit logging** for all critical actions
+- **Encryption** (at-rest/transit)
+- **Kong rate limiting** & auth plugins
 
 ---
 
-## 🔧 Common Tasks
+## 📊 GAAP Compliance
 
-### View Service Logs
-```bash
-# All services
-docker compose logs -f
+- Accrual accounting journal entries
+- Ledger + audit trail for every transaction
+- Financial reports: balance sheet, income statement, aging receivables
+- QuickBooks/Xero export ready
+- Rent collection → payout flow with fee deductions
 
-# Specific service
-docker compose logs -f charter-service
-docker compose logs -f client-service
-```
+---
 
-### Restart Services
-```bash
-# Single service
-docker compose restart charter-service
+## 🧪 Testing
 
-# All services
-docker compose restart
-```
-
-### Rebuild After Code Changes
-```bash
-# Specific service
-docker compose up -d --build charter-service
-
-# All services
-docker compose up -d --build
-```
-
-### Database Access
-```bash
-# PostgreSQL
-docker compose exec postgres psql -U athena -d athena
-
-# MongoDB
-docker compose exec mongodb mongosh -u athena -p athena_dev_password
-```
-
-### Health Check
-```bash
-# Check all services
-docker compose ps
-
-# Test API Gateway
-curl http://localhost:8080/api/v1/auth/health
-curl http://localhost:8080/api/v1/charters/health
-```
+- **Unit tests**: Service-level (pytest)
+- **Integration tests**: API endpoints, DB transactions
+- **E2E tests**: Cypress (login, CRUD, Kong routing)
+- **Test coverage**: 85%+ target
 
 ---
 
 ## 🚢 Deployment
 
-### Development
-- Uses Docker Compose
-- Hot reload enabled
-- Debug logging
-- Sample data pre-seeded
+### Docker (Staging/Production)
 
-### Production
-See [Deployment Guide](docs/DEPLOYMENT.md) for:
-- Environment variable configuration
-- SSL/TLS setup
-- Database backup strategies
-- Monitoring setup
-- Scaling considerations
-
----
-
-## 🐛 Troubleshooting
-
-### Services Won't Start
 ```bash
-# Check container status
-docker compose ps
+# Build services
+docker-compose -f docker-compose.staging.yml build
 
-# Check for port conflicts
-lsof -i :8080  # Kong
-lsof -i :3000  # Frontend
+# Start
+docker-compose -f docker-compose.staging.yml up -d
 
-# View logs
-docker compose logs postgres
-docker compose logs kong
+# Health check
+curl -f http://localhost:8015/health
 ```
 
-### Database Connection Issues
-```bash
-# Verify PostgreSQL
-docker compose exec postgres pg_isready
+### GitHub Actions CI/CD
 
-# Check MongoDB
-docker compose exec mongodb mongosh --eval "db.adminCommand('ping')"
-```
-
-### Kong Route Issues
-```bash
-# Verify Kong health
-curl http://localhost:8001/status
-
-# List services
-curl http://localhost:8001/services
-
-# List routes
-curl http://localhost:8001/routes
-```
-
----
-
-## 🔒 Security Notes
-
-**⚠️ Default credentials are for development only!**
-
-**For Production:**
-1. ✅ Change all passwords in `.env`
-2. ✅ Generate new JWT secrets
-3. ✅ Configure SSL/TLS for Kong
-4. ✅ Enable Grafana authentication
-5. ✅ Restrict database network access
-6. ✅ Use production Stripe keys
-7. ✅ Configure real SMTP credentials
-8. ✅ Enable rate limiting on Kong
-
----
-
-## 📞 Support
-
-- **Documentation**: [docs/README.md](docs/README.md)
-- **Architecture**: [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
-- **Frontend Integration**: [docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md)
-- **API Testing**: [docs/KONG_TESTING_STANDARD.md](docs/KONG_TESTING_STANDARD.md)
-
----
-
-**System Status**: ✅ Production Ready for Frontend Integration  
-**Version**: 2.0.0  
-**Last Updated**: February 4, 2026  
-**Test Coverage**: 100%
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete security checklist.
-
----
-
-## 📞 Support
-
-For issues or questions:
-- Check documentation in `/docs`
-- Review container logs
-- Verify all services are running with `podman-compose ps`
+See `.github/workflows/ci.yml` for:
+- Test → Build → Staging deploy pipeline
+- Automatic rollback on unhealthy status
 
 ---
 
 ## 📝 License
 
-Proprietary - US Coachways Internal Use Only
+MIT License — see LICENSE for details.
+
+---
+
+## 🤝 Support
+
+- 📧 Email: support@pm-demo.com
+- 💬 Discord: https://discord.gg/pm-demo
+- 📚 Docs: https://docs.pm-demo.com
