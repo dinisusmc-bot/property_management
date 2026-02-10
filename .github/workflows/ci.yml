@@ -1,0 +1,50 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: cd frontend && npm ci
+      - name: Run lint
+        run: cd frontend && npm run lint
+      - name: Build
+        run: cd frontend && npm run build
+
+  e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Cypress
+        run: cd frontend && npm install cypress --save-dev
+      - name: Run Cypress
+        run: cd frontend && npx cypress run
+
+  deploy-staging:
+    needs: e2e
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment..."
+          echo "Services: owners, properties, units, tenants, maintenance"
+          echo "Run: docker-compose -f docker-compose.staging.yml up -d"
+          curl -f http://localhost:8000/health || exit 1

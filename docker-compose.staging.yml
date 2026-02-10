@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: openclaw
+      POSTGRES_PASSWORD: openclaw_dev_pass
+      POSTGRES_DB: openclaw_staging
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+
+  owners:
+    build: ./backend/services/owners
+    ports:
+      - "8015:8015"
+    environment:
+      DATABASE_URL: postgresql://openclaw:openclaw_dev_pass@postgres:5432/openclaw_staging
+    depends_on:
+      - postgres
+
+  properties:
+    build: ./backend/services/properties
+    ports:
+      - "8016:8016"
+    environment:
+      DATABASE_URL: postgresql://openclaw:openclaw_dev_pass@postgres:5432/openclaw_staging
+    depends_on:
+      - postgres
+
+  units:
+    build: ./backend/services/units
+    ports:
+      - "8017:8017"
+    environment:
+      DATABASE_URL: postgresql://openclaw:openclaw_dev_pass@postgres:5432/openclaw_staging
+    depends_on:
+      - postgres
+
+  tenants:
+    build: ./backend/services/tenants
+    ports:
+      - "8018:8018"
+    environment:
+      DATABASE_URL: postgresql://openclaw:openclaw_dev_pass@postgres:5432/openclaw_staging
+    depends_on:
+      - postgres
+
+  maintenance:
+    build: ./backend/services/maintenance
+    ports:
+      - "8019:8019"
+    environment:
+      DATABASE_URL: postgresql://openclaw:openclaw_dev_pass@postgres:5432/openclaw_staging
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data_staging:
