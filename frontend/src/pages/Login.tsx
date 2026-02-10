@@ -1,102 +1,103 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  Box,
-  Container,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Alert,
-} from '@mui/material'
-import { useAuthStore } from '../store/authStore'
-import { authService } from '../services/auth'
+import React from 'react';
+import { Box, Container, Paper, Typography, TextField, Button, Checkbox, FormControlLabel, Link } from '@mui/material';
+import { Theme, useTheme } from '@mui/material/styles';
+import { glass } from '../theme';
 
-export default function Login() {
-  const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      console.log('Starting login...')
-      const response = await authService.login({ username: email, password })
-      console.log('Login successful, token received')
-      
-      console.log('Fetching user with token...')
-      const user = await authService.getCurrentUser(response.access_token)
-      console.log('User fetched:', user)
-      setAuth(user, response.access_token)
-      console.log('Auth set, navigating...')
-      navigate('/dashboard')
-    } catch (err: any) {
-      console.error('Login error:', err)
-      setError(err.response?.data?.detail || err.message || 'Login failed. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+const Login: React.FC = () => {
+  const theme = useTheme();
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography variant="h4" align="center" gutterBottom>
-            Athena Charter Management
-          </Typography>
-          <Typography variant="body2" align="center" color="textSecondary" sx={{ mb: 3 }}>
-            Sign in to your account
-          </Typography>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)`,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Paper
+          sx={{
+            ...glass,
+            p: 4,
+            textAlign: 'center',
+          }}
+        >
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h2" fontWeight={700} gutterBottom>
+              Property Manager
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Sign in to manage your properties
+            </Typography>
+          </Box>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => e.preventDefault()}>
             <TextField
               fullWidth
               label="Email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              margin="normal"
-              required
-              autoFocus
+              variant="outlined"
+              sx={{ mb: 3 }}
+              InputProps={{
+                sx: {
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  borderRadius: 2,
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                },
+              }}
             />
             <TextField
               fullWidth
               label="Password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              margin="normal"
-              required
+              variant="outlined"
+              sx={{ mb: 3 }}
+              InputProps={{
+                sx: {
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  borderRadius: 2,
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                },
+              }}
+            />
+            <FormControlLabel
+              control={<Checkbox defaultChecked sx={{ color: '#6366f1' }} />}
+              label="Remember me"
+              sx={{ justifyContent: 'flex-start', mb: 3 }}
             />
             <Button
-              fullWidth
               type="submit"
+              fullWidth
               variant="contained"
               size="large"
-              disabled={loading}
-              sx={{ mt: 3 }}
+              sx={{
+                py: 1.5,
+                borderRadius: 2,
+                background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                '&:hover': {
+                  background: 'linear-gradient(90deg, #4f46e5, #7c3aed)',
+                },
+              }}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              Sign In
             </Button>
           </form>
+
+          <Box sx={{ mt: 3 }}>
+            <Link href="#" underline="hover" color="text.secondary">
+              Forgot password?
+            </Link>
+          </Box>
         </Paper>
-      </Box>
-    </Container>
-  )
-}
+      </Container>
+    </Box>
+  );
+};
+
+export default Login;
